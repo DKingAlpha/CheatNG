@@ -1,0 +1,14 @@
+[submodule "thirdparty/imgui"]
+	path = thirdparty/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = master
+
+[submodule "thirdparty/glfw"]
+	path = thirdparty/glfw
+	url = https://github.com/glfw/glfw.git
+	branch = master
+
+[submodule "thirdparty/lunasvg"]
+	path = thirdparty/lunasvg
+	url = https://github.com/sammycage/lunasvg.git
+	branch = master

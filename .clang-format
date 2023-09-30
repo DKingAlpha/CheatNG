@@ -1,0 +1,13 @@
+---
+BasedOnStyle: LLVM
+AlwaysBreakTemplateDeclarations: 'Yes'
+BreakBeforeBraces: Mozilla
+IndentWidth: 4
+NamespaceIndentation: All
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: All
+PointerAlignment: Left
+ColumnLimit: 240
+...
