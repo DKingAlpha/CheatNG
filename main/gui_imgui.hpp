@@ -19,4 +19,4 @@ struct ImguiRuntimeContext
     uint64_t view_addr;
 };
 
-int gui_imgui(ImguiRuntimeContext* ctx);
+bool gui_imgui(ImguiRuntimeContext* ctx);

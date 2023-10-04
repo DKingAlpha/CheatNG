@@ -98,13 +98,14 @@ int main(int, char**)
     // glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1920, 1080, "CheatNG", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(480, 480, "CheatNG", nullptr, nullptr);
     if (window == nullptr)
         return 1;
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);                                    // Enable vsync
     glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE); // no title bar
+    glfwHideWindow(window);
     // glfwSetCursorPosCallback(window, glfw_cursor_callback);   // mouse
     // passthrough=true之后，不再接受mouse move事件，所以后面callback不会被调用
     /**
@@ -131,6 +132,8 @@ int main(int, char**)
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -180,16 +183,16 @@ int main(int, char**)
     }
     ranges.push_back(0);
     font_cfg.GlyphRanges = ranges.data();
-    ImFont* cn_fonts = io.Fonts->AddFontFromFileTTF("../main/fonts/NotoSansCJK-Regular.ttc", 20.0f, &font_cfg, nullptr);
+    ImFont* cn_fonts = io.Fonts->AddFontFromFileTTF("../main/fonts/NotoSansCJK-Regular.ttc", 24.0f, &font_cfg, nullptr);
 
     ImWchar emoji_ranges[] = {0x1, 0x1FFFF, 0};
     ImFontConfig emoji_cfg;
     emoji_cfg.OversampleH = emoji_cfg.OversampleV = 1;
     emoji_cfg.MergeMode = true;
     emoji_cfg.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
-    ImFont* emoji_fonts = io.Fonts->AddFontFromFileTTF("../main/fonts/TwitterColorEmoji-SVGinOT.ttf", 16.0f, &emoji_cfg, emoji_ranges);
+    ImFont* emoji_fonts = io.Fonts->AddFontFromFileTTF("../main/fonts/TwitterColorEmoji-SVGinOT.ttf", 24.0f, &emoji_cfg, emoji_ranges);
 
-    ImFont* hex_font = io.Fonts->AddFontFromFileTTF("../main/fonts/NotoSansMono-Regular.ttf", 16.0f);
+    ImFont* hex_font = io.Fonts->AddFontFromFileTTF("../main/fonts/NotoSansMono-Regular.ttf", 20.0f);
 
     // Our state
     ImguiRuntimeContext ctx = {
@@ -225,7 +228,9 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        gui_imgui(&ctx);
+        if(!gui_imgui(&ctx)) {
+            glfwSetWindowShouldClose(window, true);
+        }
 
         // Rendering
         ImGui::Render();
@@ -235,6 +240,14 @@ int main(int, char**)
         glClearColor(ctx.clear_color.x * ctx.clear_color.w, ctx.clear_color.y * ctx.clear_color.w, ctx.clear_color.z * ctx.clear_color.w, ctx.clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+        {
+            GLFWwindow* backup_current_context = glfwGetCurrentContext();
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
+            glfwMakeContextCurrent(backup_current_context);
+        }
 
         glfwSwapBuffers(window);
     }

@@ -273,6 +273,7 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
 
     static uint64_t edit_addr = 0;
     static int view_width = 16;
+    static int view_width_step = view_width / 2;
     static int view_height = 16;
 
     auto& proc = ctx->proc;
@@ -379,10 +380,26 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
     static bool display_hex = true;
     ImGui::SameLine();
     ImGui::Checkbox("Hex"_x, &display_hex);
-    // input text to change view addr
-    static uint64_t view_addr_step = 0x10;
-    static uint64_t view_addr_step_fast = 0x1000;
+    // select width per row
     ImGui::SameLine();
+    ImGui::PushItemWidth(ImGui::CalcTextSize("[0xff]|+|-|Bytes Per Row").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+    if (ImGui::InputScalar("Bytes Per Row"_x, ImGuiDataType_U32, &view_width, &view_width_step, &view_width_step, "0x%x")) {
+        if (view_width % view_width_step != 0) {
+            view_width = ((view_width / view_width_step) + 1) * view_width_step;
+        }
+    }
+    ImGui::SameLine();
+    constexpr int step_by_1_u32 = 1;
+    ImGui::PushItemWidth(ImGui::CalcTextSize("[0xff]|+|-|Rows").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+    ImGui::InputScalar("Row Count"_x, ImGuiDataType_U32, &view_height, &step_by_1_u32, &step_by_1_u32, "0x%x");
+
+
+
+    // input text to change view addr
+    constexpr uint64_t view_addr_step = 0x10;
+    constexpr uint64_t view_addr_step_fast = 0x1000;
+    ImGui::SameLine();
+    ImGui::PushItemWidth(ImGui::CalcTextSize("0x01234567890abcdef|+-|Memory Addrress").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     ImGui::InputScalar("Memory Address"_x, ImGuiDataType_U64, &view_addr, &view_addr_step, &view_addr_step_fast, "%016lX", ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsHexadecimal);
 
     for (auto* err : {&open_process_err, &update_region_err, &read_mem_err, &write_mem_err}) {
@@ -414,16 +431,17 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
     const uint8_t* remote_data = mem_view->data().data();
     std::string module_name = std::format("{:#0X}", view_addr);
     if (auto region_it = mem_regions->search(view_addr); region_it != mem_regions->end()) {
-        module_name = std::format("{}({:#0X})+{:#0X}", region_it->name, region_it->start, view_addr - region_it->start);
+        module_name = std::format("{}({:#0X})+{:#0X} {}", region_it->name, region_it->start, view_addr - region_it->start, to_string(region_it->prot));
     }
     ImGui::SeparatorText(module_name.c_str());
 
     ImGui::BeginChild("##mem_view", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     if (ImGui::IsWindowHovered()) {
+        uint64_t step = ImGui::IsKeyboardKey(ImGuiKey_ModShift) ? view_addr_step_fast : view_addr_step;
         if (ctx->io->MouseWheel > 0) {
-            view_addr -= 0x10;
+            view_addr -= step;
         } else if (ctx->io->MouseWheel < 0) {
-            view_addr += 0x10;
+            view_addr += step;
         }
     }
     int cell_width = display_hex ? MemoryViewDisplayDataTypeStrWidthHex[display_data_type] : MemoryViewDisplayDataTypeStrWidth[display_data_type];
@@ -481,6 +499,8 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
                     } else {
                         write_mem_err = {GuiResultAction_Error, std::format("{}: {}. errno: {}", "Invalid input"_x, edit_data_str, std::strerror(errno))};
                     }
+                    edit_addr = 0;
+                    edit_data_str.clear();
                 }
                 ImGui::PopStyleVar(3);
                 ImGui::PopItemWidth();
@@ -526,15 +546,15 @@ static void cross_edit_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool&
             for (const auto& region : *ctx->mem_regions) {
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
-                ImGui::Text("%#0lX", region.start);
+                ImGui::Text("%016lX", region.start);
                 ImGui::TableSetColumnIndex(1);
-                ImGui::Text("%#0lX", region.start + region.size);
+                ImGui::Text("%016lX", region.start + region.size);
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%lX", region.size);
                 ImGui::TableSetColumnIndex(3);
                 ImGui::Text("%s", to_string(region.prot).c_str());
                 ImGui::TableSetColumnIndex(4);
-                ImGui::Text("%#0lX", region.file_offset);
+                ImGui::Text("%016lX", region.file_offset);
                 ImGui::TableSetColumnIndex(5);
                 ImGui::Selectable(region.name.c_str(), false, ImGuiSelectableFlags_SpanAllColumns);
                 std::string text_id = std::format("##Memory Region {} {}", region.start, region.size);
@@ -558,15 +578,28 @@ static void cross_edit_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool&
     ImGui::End();
 }
 
-static void cross_edit_imgui(ImguiRuntimeContext* ctx)
+static bool cross_edit_imgui(ImguiRuntimeContext* ctx)
 {
     // ImGuiViewport* viewport = ImGui::GetMainViewport();
     // ImGui::SetNextWindowPos(viewport->Pos);
     // ImGui::SetNextWindowSize(viewport->Size);
     // ImGui::Begin("CheatNG", NULL, ImGuiWindowFlags_NoDecoration |
     // ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
+    static bool main_window_open = true;
     ImGui::SetNextWindowSize(ImVec2(800, 600), ImGuiCond_FirstUseEver);
-    if (ImGui::Begin("CheatNG")) {
+
+    /*
+    // "Main Area = entire viewport,\nWork Area = entire viewport minus sections used by the main menu bars, task bars etc.\n\nEnable the main-menu bar in Examples menu to see the difference."
+    static bool use_work_area = true;
+    static ImGuiWindowFlags main_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings;
+    // We demonstrate using the full viewport area or the work area (without menu-bars, task-bars etc.)
+    // Based on your use case you may want one or the other.
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(use_work_area ? viewport->WorkPos : viewport->Pos);
+    ImGui::SetNextWindowSize(use_work_area ? viewport->WorkSize : viewport->Size);
+    */
+
+    if (ImGui::Begin("CheatNG", &main_window_open)) {
         //// process status
         static int selected_pid = -1; // for table selection. not the final pid we are opening
         static int selected_pid_next = -1;
@@ -574,6 +607,7 @@ static void cross_edit_imgui(ImguiRuntimeContext* ctx)
 
         //// buttons
         if (ImGui::Button("🖥️")) {
+            ImGui::SetNextWindowSize(ImVec2(500, 440), ImGuiCond_FirstUseEver);
             ImGui::OpenPopup("Choose Process"_x);
         }
         ImGui::SameLine();
@@ -585,13 +619,13 @@ static void cross_edit_imgui(ImguiRuntimeContext* ctx)
             }
             cross_edit_show_memory_regions_imgui(ctx, show_memory_regions);
         }
-        //// choose process model
+        //// choose process modal
         static std::set<int> interested_pids;
         static bool show_kthread = false;
         static std::string search_buf;
-        bool model_open = true;
+        bool modal_open = true;
         // ImGui::SetNextWindowSize(ImVec2(500, 440), ImGuiCond_FirstUseEver);
-        if (ImGui::BeginPopupModal("Choose Process"_x, &model_open, ImGuiWindowFlags_None)) {
+        if (ImGui::BeginPopupModal("Choose Process"_x, &modal_open, ImGuiWindowFlags_None)) {
             ImGui::InputTextWithHint("##Search Process", "🔎 Search Process"_x, &search_buf);
             ImGui::SameLine();
             ImGui::Checkbox("Show Kernel Threads"_x, &show_kthread);
@@ -677,7 +711,7 @@ static void cross_edit_imgui(ImguiRuntimeContext* ctx)
             interested_pids.clear();
         }
 
-        if (!model_open) {
+        if (!modal_open) {
             // only when click close button of popup
             selected_pid = -1;
         }
@@ -714,10 +748,13 @@ static void cross_edit_imgui(ImguiRuntimeContext* ctx)
         }
     }
     ImGui::End();
+    return main_window_open;
 }
 
-int gui_imgui(ImguiRuntimeContext* ctx)
+bool gui_imgui(ImguiRuntimeContext* ctx)
 {
+    bool retval = cross_edit_imgui(ctx);
+
     // Our state
     static bool show_demo_window = false;
 
@@ -751,8 +788,7 @@ int gui_imgui(ImguiRuntimeContext* ctx)
     if (show_demo_window)
         ImGui::ShowDemoWindow(&show_demo_window);
 
-    cross_edit_imgui(ctx);
-    return 0;
+    return retval;
 }
 
 #pragma clang diagnostic pop

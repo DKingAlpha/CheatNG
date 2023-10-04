@@ -20,7 +20,7 @@ struct TranslationLine
     const char* translations[(int)Language::MAX];
 };
 
-constexpr Language current_language = Language::CHS;
+constexpr Language current_language = Language::EN;
 
 inline constexpr TranslationLine translations_zh[] = {
     {"🔎 Search Process", "🔎 搜索进程"},
@@ -46,11 +46,13 @@ inline constexpr TranslationLine translations_zh[] = {
     {"Start Address", "起始地址"},
     {"End Address", "结束地址"},
     {"Size", "大小"},
-    {"Protection", "权限"},
+    {"Protection", "保护属性"},
     {"File Offset", "文件偏移"},
     {"Name", "名称"},
     {"Copy Start Address", "复制起始地址"},
     {"Copy Name", "复制名称"},
+    {"Bytes Per Row", "每行宽度"},
+    {"Row Count", "行数"},
 };
 
 inline consteval const char* operator"" _x(const char* str, std::size_t len)
