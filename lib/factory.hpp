@@ -2,6 +2,7 @@
 
 #include "proc.hpp"
 #include "imp/linux/proc_usermode_proc.hpp"
+#include "imp/linux/mem_usermode_proc.hpp"
 
 class Factory
 {
@@ -37,6 +38,18 @@ public:
         {
         case ProcessesImpType::LINUX_USERMODE_PROC:
             return std::make_unique<ProcessesImp_LinuxUserMode>(args...);
+        default:
+            return {};
+        }
+    }
+
+    template <typename... Args>
+    static std::unique_ptr<IMemory> create(MemoryImpType imp, Args... args)
+    {
+        switch (imp)
+        {
+        case MemoryImpType::LINUX_USERMODE_PROC:
+            return std::make_unique<MemoryImp_LinuxUserMode>(args...);
         default:
             return {};
         }

@@ -11,6 +11,7 @@ struct CheatNGConfig
     ThreadImpType thread_imp_type;
     ProcessImpType process_imp_type;
     ProcessesImpType processes_imp_type;
+    MemoryImpType memory_imp_type;
 };
 
 struct ImguiRuntimeContext
@@ -21,6 +22,7 @@ struct ImguiRuntimeContext
 
     // shared states used by imgui windows
     std::unique_ptr<IProcess> proc;
+    std::unique_ptr<IMemory> mem;
     std::unique_ptr<MemoryView> mem_view;
     std::unique_ptr<MemoryRegions> mem_regions;
     uint64_t view_addr;

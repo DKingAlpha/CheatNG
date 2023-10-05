@@ -1,14 +1,10 @@
-#include "mem.hpp"
+#include "imp/linux/mem_usermode_proc.hpp"
 #include "proc.hpp"
 #include <fstream>
 #include <sstream>
 #include <sys/uio.h>
 
-Memory::Memory(int pid) : _pid(pid) {}
-
-Memory::Memory(const IProcess& proc) : Memory(proc.id) {}
-
-ssize_t Memory::read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const
+ssize_t MemoryImp_LinuxUserMode::read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const
 {
     data.resize(size);
     struct iovec local[1];
@@ -26,7 +22,7 @@ ssize_t Memory::read(uint64_t addr, size_t size, std::vector<uint8_t>& data) con
     return count;
 }
 
-ssize_t Memory::write(uint64_t addr, std::vector<uint8_t>& data) const
+ssize_t MemoryImp_LinuxUserMode::write(uint64_t addr, std::vector<uint8_t>& data) const
 {
     struct iovec local[1];
     struct iovec remote[1];
@@ -79,7 +75,7 @@ struct linux_maps_line
     }
 };
 
-MemoryRegions Memory::regions() const
+MemoryRegions MemoryImp_LinuxUserMode::regions() const
 {
     MemoryRegions regions;
     std::ifstream maps("/proc/" + std::to_string(_pid) + "/maps");

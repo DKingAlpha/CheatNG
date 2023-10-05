@@ -250,6 +250,7 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
     static int view_height = 16;
 
     auto& proc = ctx->proc;
+    auto& mem = ctx->mem;
     auto& mem_view = ctx->mem_view;
     auto& mem_regions = ctx->mem_regions;
     auto& view_addr = ctx->view_addr;
@@ -261,10 +262,13 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
             if (!proc->is_valid()) {
                 return {(GuiResultAction)(GuiResultAction_CloseRemoteProcess | GuiResultAction_Error), std::format("{}: {}", "Invalid pid"_x, std::strerror(errno))};
             }
-            mem_view.reset(new MemoryView(pid));
+            mem.reset();
+            mem = Factory::create(ctx->config.memory_imp_type, pid);
+            mem_view.reset();
+            mem_view = std::make_unique<MemoryView>();
         }
         if (update_mem_regions) {
-            mem_regions.reset(new MemoryRegions(mem_view->regions()));
+            mem_regions.reset(new MemoryRegions(mem->regions()));
             if (!mem_regions->size()) {
                 return {(GuiResultAction)(GuiResultAction_CloseRemoteProcess | GuiResultAction_Error), std::format("{}: {}", "Failed to read memory regions of process"_x, std::strerror(errno))};
             }
@@ -292,14 +296,14 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
                 mem_view->set_range(mem_regions->begin()->start, mem_regions->begin()->size);
             }
 
-            if (!mem_view->update()) {
+            if (!mem_view->update(mem)) {
                 return {GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to read memory of process"_x, std::strerror(errno), mem_view->start())};
             }
         }
 
         if (update_mem_view) {
             mem_view->set_range(view_addr, view_width * view_height);
-            if (!mem_view->update()) {
+            if (!mem_view->update(mem)) {
                 return {GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to read memory of process"_x, std::strerror(errno), mem_view->start())};
             }
         }
@@ -464,7 +468,7 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
                 if (ImGui::InputText("##edit_addr", &edit_data_str, edit_flags, memory_edit_callback, (void*)cell_width)) {
                     std::vector<uint8_t> parsed_data = parse_mem_data(edit_data_str, display_hex, display_data_type);
                     if (parsed_data.size() > 0 && memcmp(parsed_data.data(), remote_data + idx, parsed_data.size()) != 0) {
-                        if (mem_view->write(addr, parsed_data) != parsed_data.size()) {
+                        if (mem->write(addr, parsed_data) != parsed_data.size()) {
                             write_mem_err = {GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to write memory of process"_x, std::strerror(errno), addr)};
                         } else {
                             write_mem_err = {GuiResultAction_OK, ""};

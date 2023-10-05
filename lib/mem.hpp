@@ -4,6 +4,12 @@
 #include <string>
 #include <vector>
 
+enum class MemoryImpType
+{
+    LINUX_USERMODE_PROC,
+    LINUX_KERNEL_MODULE,
+};
+
 enum class MemoryProtectionFlags : uint32_t
 {
     NONE = 0,
@@ -80,6 +86,8 @@ inline std::string to_string(MemoryProtectionFlags prot)
     return buf;
 }
 
+
+// if platform does not support some properties, leave them empty
 struct MemoryRegion
 {
     uint64_t start;
@@ -140,18 +148,15 @@ private:
     }
 };
 
-class IProcess;
-
-class Memory
+class IMemory
 {
 public:
-    Memory(int pid);
-    Memory(const IProcess& proc);
+    IMemory(int pid) : _pid(pid) {}
+    virtual ~IMemory() = default;
 
-    ssize_t read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const;
-    ssize_t write(uint64_t addr, std::vector<uint8_t>& data) const;
-
-    MemoryRegions regions() const;
+    virtual MemoryRegions regions() const = 0;
+    virtual ssize_t read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const = 0;
+    virtual ssize_t write(uint64_t addr, std::vector<uint8_t>& data) const = 0;
 
 protected:
     int _pid;

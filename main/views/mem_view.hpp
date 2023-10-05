@@ -1,26 +1,25 @@
 #pragma once
 
 #include "mem.hpp"
+#include <memory>
 
-class MemoryView : public Memory
+class MemoryView
 {
 public:
-    MemoryView(int pid) : Memory(pid), _view_start(0), _view_size(0){};
-    MemoryView(const IProcess& proc)
-        : Memory(proc), _view_start(0), _view_size(0){};
+    MemoryView() : _view_start(0), _view_size(0) {};
 
     void set_range(uint64_t start, uint64_t size)
     {
         _view_start = start;
         _view_size = size;
     }
-    bool update()
+    bool update(const std::unique_ptr<IMemory>& mem)
     {
         if (_view_size == 0) {
             _view_data.clear();
             return false;
         }
-        return read(_view_start, _view_size, _view_data) >= 0;
+        return mem->read(_view_start, _view_size, _view_data) >= 0;
     }
 
     const std::vector<uint8_t>& data() const { return _view_data; }
