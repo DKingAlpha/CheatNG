@@ -31,3 +31,8 @@ private:
     uint64_t _view_size;
     std::vector<uint8_t> _view_data;
 };
+
+class ISearchMemory
+{
+
+};

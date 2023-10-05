@@ -4,7 +4,7 @@
 #include "imgui_stdlib.h"
 #include "i18n/i18n.hpp"
 #include "proc.hpp"
-#include "views/mem_view.hpp"
+#include "mem_utils.hpp"
 #include "factory.hpp"
 
 #include <stdint.h>

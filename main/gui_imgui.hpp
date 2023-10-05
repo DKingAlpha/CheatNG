@@ -4,7 +4,7 @@
 #include <memory>
 #include "proc.hpp"
 #include "mem.hpp"
-#include "views/mem_view.hpp"
+#include "mem_utils.hpp"
 
 struct CheatNGConfig
 {
