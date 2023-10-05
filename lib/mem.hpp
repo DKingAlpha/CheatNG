@@ -140,13 +140,13 @@ private:
     }
 };
 
-class Process;
+class IProcess;
 
 class Memory
 {
 public:
     Memory(int pid);
-    Memory(const Process& proc);
+    Memory(const IProcess& proc);
 
     ssize_t read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const;
     ssize_t write(uint64_t addr, std::vector<uint8_t>& data) const;

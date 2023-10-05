@@ -9,18 +9,18 @@ It is also designed to be extensible and customizable, so that it can be easily 
 W.I.P
 
 ```
-Architecture Portability
+Portable Architecture
 
-              ┌─────────────────────┐
-              │             CheatNG GUI                  │
-              └──┬───────────────┬──┘
-                    │                              │
-                    │                              │
-┌─────────▼───┐    ┌────────▼─────────┐
-│           imgui          │    │      Abstract OS Layer             │
-├─────────────┤    ├──────┬─────┬─────┤
-│         OpenGL/SDL       │    │  IProcess  │ IThread  │ IMemory  │
-└─────────────┘    └──────┴─────┴─────┘
++-------------------------------------------------------+
+|                   CheatNG GUI                         |
++-------------------------------------------------------+
+      |                             |                    
+      |                             |                    
++-----v-------+      +--------------v-------------------+
+|    imgui    |      |       Abstract OS Layer          |
++-------------+      +----------------------------------+
+|  OpenGL/SDL |      |    IProcess   IThread   IMemory  |
++-------------+      +----------------------------------+
 ```
 
 ## Supported OS
@@ -46,11 +46,11 @@ Architecture Portability
 
 Implementations are extensible under strategy pattern.
 
-- [x] POSIX - process_vm_rw
-- [ ] POSIX - /proc/\<pid\>/mem
-- [ ] POSIX - ptrace
-- [ ] POSIX - Kernel Module
-- [ ] POSIX - Mem Injection
+- [x] Linux - process_vm_rw
+- [ ] Linux - /proc/\<pid\>/mem
+- [ ] Linux - ptrace
+- [ ] Linux - Kernel Module
+- [ ] Linux - Mem Injection
 - [ ] Windows - RWProcessMemory / NtRWVirtualMemory
 - [ ] Windows - Kernel Driver
 - [ ] Nintendo Switch - Debugging

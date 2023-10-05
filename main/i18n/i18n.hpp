@@ -24,6 +24,7 @@ constexpr Language current_language = Language::EN;
 
 inline constexpr TranslationLine translations_zh[] = {
     {"🔎 Search Process", "🔎 搜索进程"},
+    {"🔎 Search Module", "🔎 搜索模块"},
     {"Choose Process", "选择进程"},
     {"Process List", "进程列表"},
     {"Show Kernel Threads", "显示内核线程"},

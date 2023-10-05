@@ -6,7 +6,7 @@ class MemoryView : public Memory
 {
 public:
     MemoryView(int pid) : Memory(pid), _view_start(0), _view_size(0){};
-    MemoryView(const Process& proc)
+    MemoryView(const IProcess& proc)
         : Memory(proc), _view_start(0), _view_size(0){};
 
     void set_range(uint64_t start, uint64_t size)

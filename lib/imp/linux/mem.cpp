@@ -6,7 +6,7 @@
 
 Memory::Memory(int pid) : _pid(pid) {}
 
-Memory::Memory(const Process& proc) : Memory(proc.id()) {}
+Memory::Memory(const IProcess& proc) : Memory(proc.id) {}
 
 ssize_t Memory::read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const
 {

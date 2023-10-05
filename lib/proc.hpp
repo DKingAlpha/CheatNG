@@ -1,40 +1,66 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "base.hpp"
 
-class Thread : public IValidBoolOp
+
+enum class ThreadImpType
 {
-public:
-    Thread(int id);
-    Thread(int id, int parent_id);
-
-    virtual bool is_valid() const override;
-
-    // display name only. For linux it is the content of "comm"
-    inline const int id() const { return _id; }
-    inline const int parent_id() const { return _parent_id; }
-    inline const std::string& name() const { return _name; }
-
-protected:
-    int _id;
-    int _parent_id;
-    std::string _name;
+    LINUX_USERMODE_PROC,
+    LINUX_KERNEL_MODULE,
 };
 
-class Process : public Thread
+enum class ProcessImpType
+{
+    LINUX_USERMODE_PROC,
+    LINUX_KERNEL_MODULE,
+};
+
+enum class ProcessesImpType
+{
+    LINUX_USERMODE_PROC,
+    LINUX_KERNEL_MODULE,
+};
+
+class TaskPropertiesReadOnly
 {
 public:
-    Process(int id);
-    Process(int id, int parent_id);
+    TaskPropertiesReadOnly(int id, int parent_id, const std::string& name) : id(id), parent_id(parent_id), name(name) {}
 
-    virtual bool is_valid() const override;
+    const int id;
+    const int parent_id;
+    const std::string name;
 
-    // argv. For linux it is the content of "cmdline" splited by \0
-    const std::vector<std::string> cmdlines() const;
+    TaskPropertiesReadOnly& operator=(const TaskPropertiesReadOnly& other)
+    {
+        const_cast<int&>(id) = other.id;
+        const_cast<int&>(parent_id) = other.parent_id;
+        const_cast<std::string&>(name) = other.name;
+        return *this;
+    }
+};
 
+class IThread : public IValidBoolOp, public virtual TaskPropertiesReadOnly
+{
+public:
+    IThread() = default;
+    virtual ~IThread() = default;
+};
+
+class IProcess : public IValidBoolOp, public virtual TaskPropertiesReadOnly
+{
+public:
+    IProcess() = default;
+    virtual ~IProcess() = default;
+
+    virtual const std::vector<std::string> cmdlines() const = 0;
+    virtual const std::vector<std::unique_ptr<IThread>> threads() const = 0;
+    virtual const std::vector<std::unique_ptr<const IProcess>> children() const = 0;
+
+    // helper function
     const std::string cmdlines_str() const
     {
         std::string s;
@@ -43,33 +69,20 @@ public:
         }
         return s;
     }
-
-    // get current threads
-    const std::vector<Thread> threads() const;
-
-    // must call Processes::build_tree() before calling this method
-    const std::vector<const Process*>& children() const { return _children; };
-
-private:
-    friend class Processes;
-    std::vector<const Process*> _children;
 };
 
 /**
- * @brief RAII process list.
- * NOT Thread-Safe.
- *
- * Also provides additional methods to operate process list.
+ * @brief RAII process list. Ascending order by pid.
  */
-class Processes : public std::vector<Process>
+class IProcesses : public std::vector<std::unique_ptr<IProcess>>
 {
 public:
-    Processes();
+    virtual ~IProcesses() = default;
 
     /**
      * @brief update process list stored in this object.
      */
-    void update();
+    virtual void update() = 0;
 
     /**
      * @brief get process by pid, binary search to improve performance.
@@ -77,15 +90,21 @@ public:
      * @param id pid
      * @return Process* nullptr if not found
      */
-    const Process* get(int id) const;
-
-    std::vector<const Process*> children_of(Process& proc) const;
-
-    /**
-     * @brief return root list
-     *
-     * If a process has no parent (0), it is a root process.
-     * If a process's parent is not in the list, it is a root process.
-     */
-    std::vector<const Process*> build_tree();
+    const IProcess* get(int id) const
+    {
+        // binary search
+        auto& self = *this;
+        int l = 0, r = self.size() - 1;
+        while (l <= r) {
+            int m = (l + r) / 2;
+            if (self[m]->id == id) {
+                return self[m].get();
+            } else if (self[m]->id < id) {
+                l = m + 1;
+            } else {
+                r = m - 1;
+            }
+        }
+        return nullptr;
+    }
 };

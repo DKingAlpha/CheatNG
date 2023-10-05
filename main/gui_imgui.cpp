@@ -1,51 +1,24 @@
 #include "gui_imgui.hpp"
 
-#include "i18n/i18n.hpp"
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
+#include "i18n/i18n.hpp"
 #include "proc.hpp"
 #include "views/mem_view.hpp"
+#include "factory.hpp"
+
+#include <stdint.h>
 #include <cstring>
 #include <format>
 #include <memory>
 #include <set>
-#include <stdint.h>
 #include <thread>
+#include <algorithm>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wformat-security"
 #pragma clang diagnostic ignored "-Wint-to-void-pointer-cast"
 
-static void walk_process_tree(std::vector<const Process*> procs)
-{
-    static ImGuiTreeNodeFlags base_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
-    for (const Process* proc : procs) {
-        std::string display_name = proc->cmdlines_str();
-        if (display_name.empty()) {
-            display_name = proc->name();
-        }
-        std::string line = std::format("[{}] {}", proc->id(), display_name);
-        static int selected_pid = 0;
-        const bool is_selected = selected_pid == proc->id();
-        ImGuiTreeNodeFlags node_flags = base_flags;
-        if (is_selected) {
-            node_flags |= ImGuiTreeNodeFlags_Selected;
-        }
-        if (proc->children().empty()) {
-            node_flags |= ImGuiTreeNodeFlags_Leaf;
-        }
-        bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)proc->id(), node_flags, "%s", display_name.c_str());
-        if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
-            selected_pid = proc->id();
-        }
-        if (node_open) {
-            ImGui::Indent();
-            walk_process_tree(proc->children());
-            ImGui::Unindent();
-            ImGui::TreePop();
-        }
-    }
-}
 
 namespace ImGui {
     bool SelectableWrrapped(const char* label, bool selected = false, ImGuiSelectableFlags flags = 0, const ImVec2& size = ImVec2(0, 0))
@@ -267,7 +240,7 @@ int memory_edit_callback(ImGuiInputTextCallbackData* data)
     return 0;
 }
 
-static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
+static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
 {
     static int current_pid = -1;
 
@@ -283,7 +256,8 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
 
     auto update_process = [&](bool update_proc, bool update_mem_regions, bool auto_set_range, bool update_mem_view) -> GuiResult {
         if (update_proc) {
-            proc.reset(new Process(pid));
+            proc.reset();
+            proc = Factory::create(ctx->config.process_imp_type, pid);
             if (!proc->is_valid()) {
                 return {(GuiResultAction)(GuiResultAction_CloseRemoteProcess | GuiResultAction_Error), std::format("{}: {}", "Invalid pid"_x, std::strerror(errno))};
             }
@@ -302,7 +276,7 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
                 main_keyword = cmdlines[0];
             }
             if (main_keyword.empty()) {
-                main_keyword = proc->name();
+                main_keyword = proc->name;
             }
 
             bool found_main = false;
@@ -392,7 +366,6 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
     constexpr int step_by_1_u32 = 1;
     ImGui::PushItemWidth(ImGui::CalcTextSize("[0xff]|+|-|Rows").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     ImGui::InputScalar("Row Count"_x, ImGuiDataType_U32, &view_height, &step_by_1_u32, &step_by_1_u32, "0x%x");
-
 
 
     // input text to change view addr
@@ -523,7 +496,13 @@ static GuiResult cross_edit_select_process(ImguiRuntimeContext* ctx, int pid)
     return {GuiResultAction_OK, ""};
 }
 
-static void cross_edit_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool& enabled)
+static inline std::string str_tolower(std::string s)
+{
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    return s;
+}
+
+static void cheatng_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool& enabled)
 {
     if (!enabled) {
         return;
@@ -532,7 +511,11 @@ static void cross_edit_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool&
         enabled = false;
         return;
     }
+    ImGui::SetNextWindowSize(ImVec2(1280, 600), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Memory Regions"_x, &enabled), ImGuiWindowFlags_AlwaysAutoResize) {
+        static std::string search_buf;
+        ImGui::InputTextWithHint("##Search Module", "🔎 Search Module"_x, &search_buf);
+
         if (ImGui::BeginTable("##Memory Regions List", 6,
                                 ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
             ImGui::TableSetupColumn("Start Address"_x);
@@ -544,6 +527,9 @@ static void cross_edit_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool&
             ImGui::TableHeadersRow();
 
             for (const auto& region : *ctx->mem_regions) {
+                if (search_buf.size() > 0 && str_tolower(region.name).find(str_tolower(search_buf)) == std::string::npos) {
+                    continue;
+                }
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 ImGui::Text("%016lX", region.start);
@@ -571,6 +557,9 @@ static void cross_edit_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool&
                     }
                     ImGui::EndPopup();
                 }
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                    ctx->view_addr = region.start;
+                }
             }
             ImGui::EndTable();
         }
@@ -578,7 +567,7 @@ static void cross_edit_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool&
     ImGui::End();
 }
 
-static bool cross_edit_imgui(ImguiRuntimeContext* ctx)
+static bool cheatng_imgui(ImguiRuntimeContext* ctx)
 {
     // ImGuiViewport* viewport = ImGui::GetMainViewport();
     // ImGui::SetNextWindowPos(viewport->Pos);
@@ -617,14 +606,14 @@ static bool cross_edit_imgui(ImguiRuntimeContext* ctx)
             if (ImGui::Button("Ⓜ️")) {
                 show_memory_regions = true;
             }
-            cross_edit_show_memory_regions_imgui(ctx, show_memory_regions);
+            cheatng_show_memory_regions_imgui(ctx, show_memory_regions);
         }
         //// choose process modal
         static std::set<int> interested_pids;
         static bool show_kthread = false;
-        static std::string search_buf;
         bool modal_open = true;
-        // ImGui::SetNextWindowSize(ImVec2(500, 440), ImGuiCond_FirstUseEver);
+        static std::string search_buf;
+        ImGui::SetNextWindowSize(ImVec2(800, 440), ImGuiCond_FirstUseEver);
         if (ImGui::BeginPopupModal("Choose Process"_x, &modal_open, ImGuiWindowFlags_None)) {
             ImGui::InputTextWithHint("##Search Process", "🔎 Search Process"_x, &search_buf);
             ImGui::SameLine();
@@ -635,58 +624,56 @@ static bool cross_edit_imgui(ImguiRuntimeContext* ctx)
                 ImGui::TableSetupColumn("Command lines"_x);
                 ImGui::TableHeadersRow();
 
-                static auto processes = Processes();
-                processes.build_tree();
+                static auto processes = Factory::create(ctx->config.processes_imp_type);
                 static double last_update_time = 0.0;
                 double current_time = ImGui::GetTime();
                 if (current_time - last_update_time > 1.0) {
                     last_update_time = current_time;
-                    processes.update();
-                    processes.build_tree();
+                    processes->update();
                 }
-                for (const auto& proc : processes) {
-                    std::string display_name = proc.cmdlines_str();
+                for (const auto& proc : *processes) {
+                    std::string display_name = proc->cmdlines_str();
                     if (!show_kthread && display_name.empty()) {
                         continue;
                     }
                     if (display_name.empty()) {
-                        display_name = std::format("[{}]", proc.name());
+                        display_name = std::format("[{}]", proc->name);
                     }
-                    if (search_buf.size() > 0 && display_name.find(search_buf) == std::string::npos) {
+                    if (search_buf.size() > 0 && str_tolower(display_name).find(str_tolower(search_buf)) == std::string::npos) {
                         // don't filter out pid we are interersted in
-                        if (!interested_pids.contains(proc.id())) {
+                        if (!interested_pids.contains(proc->id)) {
                             continue;
                         }
                     }
-                    std::string line = std::format("{}##[{}]", proc.id(), display_name);
-                    ImGui::PushID(proc.id());
+                    std::string line = std::format("{}##[{}]", proc->id, display_name);
+                    ImGui::PushID(proc->id);
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
-                    ImGui::Text("%d", proc.id());
+                    ImGui::Text("%d", proc->id);
                     ImGui::TableSetColumnIndex(1);
-                    if (ImGui::Selectable(display_name.c_str(), selected_pid == proc.id(), ImGuiSelectableFlags_DontClosePopups | ImGuiSelectableFlags_SpanAllColumns)) {
-                        selected_pid = proc.id();
+                    if (ImGui::Selectable(display_name.c_str(), selected_pid == proc->id, ImGuiSelectableFlags_DontClosePopups | ImGuiSelectableFlags_SpanAllColumns)) {
+                        selected_pid = proc->id;
                     }
                     ImGui::PopID();
-                    if (selected_pid_next == proc.id()) {
-                        selected_pid = proc.id();
+                    if (selected_pid_next == proc->id) {
+                        selected_pid = proc->id;
                         selected_pid_next = -1;
                         ImGui::SetScrollHereY(0.5);
                     }
 
                     if (ImGui::BeginPopupContextItem()) {
-                        selected_pid = proc.id();
-                        std::string jump_to_parent = std::format("{} [{}] {}", "Jump To Parent"_x, proc.parent_id(), Process(proc.parent_id()).cmdlines_str());
+                        selected_pid = proc->id;
+                        std::string jump_to_parent = std::format("{} [{}] {}", "Jump To Parent"_x, proc->parent_id, Factory::create(ctx->config.process_imp_type, proc->parent_id)->cmdlines_str());
                         if (ImGui::SelectableWrrapped(jump_to_parent.c_str())) {
-                            selected_pid_next = proc.parent_id(); // scroll in next frame
+                            selected_pid_next = proc->parent_id; // scroll in next frame
                             interested_pids.insert(selected_pid_next);
                         }
-                        if (proc.children().size() > 0) {
+                        if (proc->children().size() > 0) {
                             if (ImGui::BeginMenu("Jump To Children"_x)) {
-                                for (const auto& child : proc.children()) {
-                                    std::string jump_to_child = std::format("[{}] {}", child->id(), child->cmdlines_str());
+                                for (const auto& child : proc->children()) {
+                                    std::string jump_to_child = std::format("[{}] {}", child->id, child->cmdlines_str());
                                     if (ImGui::SelectableWrrapped(jump_to_child.c_str())) {
-                                        selected_pid_next = child->id(); // scroll in next frame
+                                        selected_pid_next = child->id; // scroll in next frame
                                         interested_pids.insert(selected_pid_next);
                                     }
                                 }
@@ -696,11 +683,9 @@ static bool cross_edit_imgui(ImguiRuntimeContext* ctx)
                         ImGui::EndPopup();
                     }
 
-                    if (ImGui::IsItemHovered()) {
-                        if (ImGui::IsMouseDoubleClicked(0)) {
-                            opened_pid = proc.id();
-                            ImGui::CloseCurrentPopup();
-                        }
+                    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                        opened_pid = proc->id;
+                        ImGui::CloseCurrentPopup();
                     }
                 }
                 ImGui::EndTable();
@@ -722,7 +707,7 @@ static bool cross_edit_imgui(ImguiRuntimeContext* ctx)
         if (opened_pid && opened_pid >= 0) {
             // open memory view
             if (!(gui_result.action & GuiResultAction_CloseRemoteProcess)) {
-                gui_result = cross_edit_select_process(ctx, opened_pid);
+                gui_result = cheatng_select_process(ctx, opened_pid);
             }
 
             if (gui_result.action & GuiResultAction_CloseRemoteProcess) {
@@ -753,7 +738,7 @@ static bool cross_edit_imgui(ImguiRuntimeContext* ctx)
 
 bool gui_imgui(ImguiRuntimeContext* ctx)
 {
-    bool retval = cross_edit_imgui(ctx);
+    bool retval = cheatng_imgui(ctx);
 
     // Our state
     static bool show_demo_window = false;
