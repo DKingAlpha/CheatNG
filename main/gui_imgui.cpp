@@ -1,24 +1,23 @@
 #include "gui_imgui.hpp"
 
+#include "factory.hpp"
+#include "i18n/i18n.hpp"
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
-#include "i18n/i18n.hpp"
-#include "proc.hpp"
 #include "mem_utils.hpp"
-#include "factory.hpp"
+#include "proc.hpp"
 
-#include <stdint.h>
+#include <algorithm>
 #include <cstring>
 #include <format>
 #include <memory>
 #include <set>
+#include <stdint.h>
 #include <thread>
-#include <algorithm>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wformat-security"
 #pragma clang diagnostic ignored "-Wint-to-void-pointer-cast"
-
 
 namespace ImGui {
     bool SelectableWrrapped(const char* label, bool selected = false, ImGuiSelectableFlags flags = 0, const ImVec2& size = ImVec2(0, 0))
@@ -69,12 +68,11 @@ int memory_edit_callback(ImGuiInputTextCallbackData* data)
     return 0;
 }
 
-
 bool CheatNGGUI::tick_update_process()
 {
-    // if (pid < 0) {
-    //     return false;
-    // }
+    if (pid < 0) {
+        return true;
+    }
 
     static int last_pid = -1;
 
@@ -195,8 +193,6 @@ bool CheatNGGUI::show_memory_editor()
     ImGui::PushItemWidth(ImGui::CalcTextSize("0x01234567890abcdef|+-|Memory Addrress").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     ImGui::InputScalar("Memory Address"_x, ImGuiDataType_U64, &view_addr, &view_addr_step, &view_addr_step_fast, "%016lX", ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsHexadecimal);
 
-    show_results();
-
     // render data
     ImGui::PushFont(hex_font);
     const uint8_t* remote_data = mem_view->data().data();
@@ -221,7 +217,7 @@ bool CheatNGGUI::show_memory_editor()
     for (int i = 0; i < view_width; i += data_type_size(display_data_type)) {
         std::string header_cell_text = std::format("{:>0{}X}", i + view_addr % view_width, cell_width);
         ImGui::TextUnformatted(header_cell_text.c_str());
-        if (i != view_width -data_type_size(display_data_type)) {
+        if (i != view_width - data_type_size(display_data_type)) {
             ImGui::SameLine();
         }
     }
@@ -303,13 +299,13 @@ bool CheatNGGUI::show_memory_editor()
 
     ImGui::PopFont();
 
-    ImGui::End();   // window
+    ImGui::End(); // window
     return true;
 }
 
 static inline std::string str_tolower(std::string s)
 {
-    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
     return s;
 }
 
@@ -318,7 +314,7 @@ bool CheatNGGUI::show_memory_regions()
     if (!is_memory_regions_open) {
         return false;
     }
-    if (!mem_regions ) {
+    if (!mem_regions) {
         is_memory_regions_open = false;
         return false;
     }
@@ -328,7 +324,7 @@ bool CheatNGGUI::show_memory_regions()
         ImGui::InputTextWithHint("##Search Module", "🔎 Search Module"_x, &search_buf);
 
         if (ImGui::BeginTable("##Memory Regions List", 6,
-                                ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
+                              ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
             ImGui::TableSetupColumn("Start Address"_x);
             ImGui::TableSetupColumn("End Address"_x);
             ImGui::TableSetupColumn("Size"_x);
@@ -409,7 +405,6 @@ bool CheatNGGUI::show_settings()
     return true;
 }
 
-
 GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, bool auto_set_range, bool update_mem_view)
 {
     if (update_proc && pid >= 0) {
@@ -470,7 +465,7 @@ GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, 
 
 bool CheatNGGUI::open_process()
 {
-    static GuiResult result = {GuiResultAction_OK, "" };
+    static GuiResult result = {GuiResultAction_OK, ""};
     static int last_pid = -1;
     if (last_pid != pid) {
         last_pid = pid;
@@ -490,7 +485,7 @@ bool CheatNGGUI::open_process()
         }
         ImGui::OpenPopup(popup_title);
         if (!popup_msg_open) {
-            result = { GuiResultAction_OK, "" };
+            result = {GuiResultAction_OK, ""};
             last_pid = -1;
             ImGui::OpenPopup("Choose Process"_x);
             return false;
@@ -500,9 +495,11 @@ bool CheatNGGUI::open_process()
     return true;
 }
 
-
 bool CheatNGGUI::show_process_list()
 {
+    if (!is_process_list_open) {
+        return true;
+    }
     static int selected_pid = -1; // for table selection. not the final pid we are opening
     static int selected_pid_next = -1;
     static int opened_pid = -1;
@@ -516,7 +513,7 @@ bool CheatNGGUI::show_process_list()
         ImGui::SameLine();
         ImGui::Checkbox("Show Kernel Threads"_x, &show_kthread);
         if (ImGui::BeginTable("##Process List", 2,
-                                ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
+                              ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
             ImGui::TableSetupColumn("PID"_x);
             ImGui::TableSetupColumn("Command lines"_x);
             ImGui::TableHeadersRow();
@@ -582,6 +579,7 @@ bool CheatNGGUI::show_process_list()
 
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                     opened_pid = proc->id;
+                    is_process_list_open = false;
                     ImGui::CloseCurrentPopup();
                 }
             }
@@ -611,7 +609,6 @@ bool CheatNGGUI::show_process_list()
     return false;
 }
 
-
 bool CheatNGGUI::show_results()
 {
     /*
@@ -622,10 +619,10 @@ bool CheatNGGUI::show_results()
     }
     */
 
-    if (ImGui::Button("Clear All"_x)) {
+    if (results.size() && ImGui::Button("Clear All"_x)) {
         results.clear();
     }
-    for (auto it = results.begin(); it != results.end(); ) {
+    for (auto it = results.begin(); it != results.end();) {
         auto err = it->second;
         if (err.action == GuiResultAction_OK) {
             it = results.erase(it);
@@ -654,11 +651,11 @@ bool CheatNGGUI::show_results()
             it++;
         }
     }
-    ImGui::EndChild();
+    // ImGui::EndChild();
     return true;
 }
 
-bool CheatNGGUI::main_panel()
+bool CheatNGGUI::show_main_panel()
 {
     // ImGuiViewport* viewport = ImGui::GetMainViewport();
     // ImGui::SetNextWindowPos(viewport->Pos);
@@ -683,6 +680,7 @@ bool CheatNGGUI::main_panel()
         //// buttons
         if (ImGui::Button("🖥️")) {
             ImGui::SetNextWindowSize(ImVec2(500, 440), ImGuiCond_FirstUseEver);
+            is_process_list_open = true;
             ImGui::OpenPopup("Choose Process"_x);
         }
         if (ImGui::IsItemHovered()) {
@@ -699,7 +697,6 @@ bool CheatNGGUI::main_panel()
         }
         show_settings();
 
-        ImGui::SameLine();
         if (pid >= 0) {
             ImGui::SameLine();
             ImGui::Text("[%d] %s", pid, proc ? proc->cmdlines_str().c_str() : "");
@@ -728,6 +725,14 @@ bool CheatNGGUI::main_panel()
             show_memory_regions();
             show_memory_search();
         }
+
+        // log
+        if (!tick_update_process()) {
+            reset_process();
+            reset_sub_windows();
+        }
+        show_results();
+
     }
     ImGui::End();
     return main_window_open;
@@ -735,12 +740,7 @@ bool CheatNGGUI::main_panel()
 
 bool CheatNGGUI::tick()
 {
-    bool retval = main_panel();
-    if (!tick_update_process()) {
-        pid = -1;
-        show_results();
-    }
-
+    bool retval = show_main_panel();
     // Our state
     static bool show_demo_window = false;
 
