@@ -108,13 +108,6 @@ int main(int, char**)
     glfwHideWindow(window);
     // glfwSetCursorPosCallback(window, glfw_cursor_callback);   // mouse
     // passthrough=true之后，不再接受mouse move事件，所以后面callback不会被调用
-    /**
-     * imgui_impl_glfw.cpp: ImGui_ImplGlfw_UpdateMouseData need to be nopped out
-     for switch.
-     *  #ifndef __SWITCH__
-            ImGui_ImplGlfw_UpdateMouseData();
-        #endif
-     */
 #ifdef __SWITCH__
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 #endif

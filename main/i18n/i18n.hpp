@@ -15,14 +15,14 @@ enum class Language : uint32_t
     MAX,
 };
 
+inline Language current_language = Language::CHS;
+
 struct TranslationLine
 {
     const char* translations[(int)Language::MAX];
 };
 
-constexpr Language current_language = Language::EN;
-
-inline constexpr TranslationLine translations_zh[] = {
+inline constexpr TranslationLine translations_table[] = {
     {"🔎 Search Process", "🔎 搜索进程"},
     {"🔎 Search Module", "🔎 搜索模块"},
     {"Choose Process", "选择进程"},
@@ -56,14 +56,24 @@ inline constexpr TranslationLine translations_zh[] = {
     {"Row Count", "行数"},
 };
 
-inline consteval const char* operator"" _x(const char* str, std::size_t len)
+inline constexpr const char* const* get_translation_line(const char* str, std::size_t len)
 {
-    for (size_t i = 0; i < sizeof(translations_zh) / sizeof(translations_zh[0]);
+    for (size_t i = 0; i < sizeof(translations_table) / sizeof(translations_table[0]);
          i++) {
-        if (__builtin_strncmp(translations_zh[i].translations[0], str, len) ==
+        if (__builtin_strncmp(translations_table[i].translations[0], str, len) ==
             0) {
-            return translations_zh[i].translations[(int)current_language];
+            return translations_table[i].translations;
         }
     }
-    return str;
+    return nullptr;
+}
+
+inline const char* operator"" _x(const char* str, std::size_t len)
+{
+    const char* const* line = get_translation_line(str, len);
+    if (line) {
+        return line[(int)current_language];
+    } else {
+        return str;
+    }
 }

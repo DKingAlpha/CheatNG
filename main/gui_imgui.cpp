@@ -58,25 +58,6 @@ struct GuiResult
     std::string message;
 };
 
-enum MemoryViewDisplayDataType
-{
-    MemoryViewDisplayDataType_u8,
-    MemoryViewDisplayDataType_u16,
-    MemoryViewDisplayDataType_u32,
-    MemoryViewDisplayDataType_u64,
-    MemoryViewDisplayDataType_f32,
-    MemoryViewDisplayDataType_f64,
-    MemoryViewDisplayDataType_s8,
-    MemoryViewDisplayDataType_s16,
-    MemoryViewDisplayDataType_s32,
-    MemoryViewDisplayDataType_s64,
-    MemoryViewDisplayDataType_MAX,
-};
-
-static const char* MemoryViewDisplayDataTypeNames[] = {
-    "u8", "u16", "u32", "u64", "f32", "f64", "s8", "s16", "s32", "s64",
-};
-
 static int MemoryViewDisplayDataTypeWidth[] = {
     1, 2, 4, 8, 4, 8, 1, 2, 4, 8,
 };
@@ -88,138 +69,6 @@ static int MemoryViewDisplayDataTypeStrWidth[] = {
 static int MemoryViewDisplayDataTypeStrWidthHex[] = {
     2, 4, 8, 16, 20, 40, 3, 5, 9, 17,
 };
-
-static const char* MemoryViewDisplayDataTypeFormat[] = {
-    "{:4d}", "{:8d}", "{:16d}", "{:32d}", "{:20.10}", "{:40.20}", "{:4d}", "{:8d}", "{:16d}", "{:32d}",
-};
-static const char* MemoryViewDisplayDataTypeFormatHex[] = {
-    "{:02X}", "{:04X}", "{:08X}", "{:016X}", "{:20.10}", "{:40.20}", "{:+03X}", "{:+05X}", "{:+09X}", "{:+017X}",
-};
-
-static const char* MemoryViewDisplayDataTypeParseFormat[] = {
-    "%hhd", "%hd", "%d", "%ld", "%f", "%lf", "%hhd", "%hd", "%d", "%ld",
-};
-static const char* MemoryViewDisplayDataTypeParseFormatHex[] = {
-    "%hhx", "%hx", "%x", "%lx", "%f", "%lf", "%hhx", "%hx", "%x", "%lx",
-};
-
-std::vector<uint8_t> parse_mem_data(std::string& data, bool hex, MemoryViewDisplayDataType dt)
-{
-    std::vector<uint8_t> ret;
-    if (data.empty()) {
-        return ret;
-    }
-    const char* fmt = hex ? MemoryViewDisplayDataTypeParseFormatHex[dt] : MemoryViewDisplayDataTypeParseFormat[dt];
-    if (dt == MemoryViewDisplayDataType_f32) {
-        float data_float = 0.0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_float)) {
-            ret.resize(sizeof(float));
-            memcpy(ret.data(), &data_float, sizeof(float));
-        }
-    } else if (dt == MemoryViewDisplayDataType_f64) {
-        double data_double = 0.0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_double)) {
-            ret.resize(sizeof(double));
-            memcpy(ret.data(), &data_double, sizeof(double));
-        }
-    } else if (dt == MemoryViewDisplayDataType_u8) {
-        uint8_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(uint8_t));
-            memcpy(ret.data(), &data_int, sizeof(uint8_t));
-        }
-    } else if (dt == MemoryViewDisplayDataType_u16) {
-        uint16_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(uint16_t));
-            memcpy(ret.data(), &data_int, sizeof(uint16_t));
-        }
-    } else if (dt == MemoryViewDisplayDataType_u32) {
-        uint32_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(uint32_t));
-            memcpy(ret.data(), &data_int, sizeof(uint32_t));
-        }
-    } else if (dt == MemoryViewDisplayDataType_u64) {
-        uint64_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(uint64_t));
-            memcpy(ret.data(), &data_int, sizeof(uint64_t));
-        }
-    } else if (dt == MemoryViewDisplayDataType_s8) {
-        int8_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(int8_t));
-            memcpy(ret.data(), &data_int, sizeof(int8_t));
-        }
-    } else if (dt == MemoryViewDisplayDataType_s16) {
-        int16_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(int16_t));
-            memcpy(ret.data(), &data_int, sizeof(int16_t));
-        }
-    } else if (dt == MemoryViewDisplayDataType_s32) {
-        int32_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(int32_t));
-            memcpy(ret.data(), &data_int, sizeof(int32_t));
-        }
-    } else if (dt == MemoryViewDisplayDataType_s64) {
-        int64_t data_int = 0;
-        if (1 == std::sscanf(data.c_str(), fmt, &data_int)) {
-            ret.resize(sizeof(int64_t));
-            memcpy(ret.data(), &data_int, sizeof(int64_t));
-        }
-    }
-    return ret;
-}
-
-std::string mem_view_data_to_str(const uint8_t* ptr, bool hex, MemoryViewDisplayDataType dt)
-{
-    const char* data_fmt = hex ? MemoryViewDisplayDataTypeFormatHex[dt] : MemoryViewDisplayDataTypeFormat[dt];
-    if (dt == MemoryViewDisplayDataType_f32) {
-        float data_float = 0.0;
-        memcpy(&data_float, ptr, sizeof(float));
-        return std::vformat(data_fmt, std::make_format_args(data_float));
-    } else if (dt == MemoryViewDisplayDataType_f64) {
-        double data_double = 0.0;
-        memcpy(&data_double, ptr, sizeof(double));
-        return std::vformat(data_fmt, std::make_format_args(data_double));
-    } else if (dt == MemoryViewDisplayDataType_u8) {
-        uint8_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(uint8_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_u16) {
-        uint16_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(uint16_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_u32) {
-        uint32_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(uint32_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_u64) {
-        uint64_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(uint64_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_s8) {
-        int8_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(int8_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_s16) {
-        int16_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(int16_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_s32) {
-        int32_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(int32_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_s64) {
-        int64_t data_int = 0;
-        memcpy(&data_int, ptr, sizeof(int64_t));
-        return std::vformat(data_fmt, std::make_format_args(data_int));
-    }
-    return "";
-}
 
 int memory_edit_callback(ImGuiInputTextCallbackData* data)
 {
@@ -343,11 +192,11 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
     }
 
     // combo to select data types
-    ImGui::PushItemWidth(ImGui::CalcTextSize("f64|").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+    ImGui::PushItemWidth(ImGui::CalcTextSize("[f32]").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     static MemoryViewDisplayDataType display_data_type = MemoryViewDisplayDataType_u8;
-    if (ImGui::BeginCombo("##view_data_type", MemoryViewDisplayDataTypeNames[display_data_type], ImGuiComboFlags_NoArrowButton)) {
-        for (int i = 0; i < MemoryViewDisplayDataType_MAX; i++) {
-            if (ImGui::Selectable(MemoryViewDisplayDataTypeNames[i])) {
+    if (ImGui::BeginCombo("##view_data_type", data_type_name(display_data_type).c_str(), ImGuiComboFlags_NoArrowButton)) {
+        for (int i = 0; i < MemoryViewDisplayDataType_cstr; i++) {
+            if (ImGui::Selectable(data_type_name((MemoryViewDisplayDataType)i).c_str())) {
                 display_data_type = (MemoryViewDisplayDataType)i;
             }
         }
@@ -362,19 +211,42 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
     ImGui::SameLine();
     ImGui::PushItemWidth(ImGui::CalcTextSize("[0xff]|+|-|Bytes Per Row").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     if (ImGui::InputScalar("Bytes Per Row"_x, ImGuiDataType_U32, &view_width, &view_width_step, &view_width_step, "0x%x")) {
-        if (view_width % view_width_step != 0) {
-            view_width = ((view_width / view_width_step) + 1) * view_width_step;
+        if (view_width / view_width_step == 3 && view_width % view_width_step == 0) {
+            // this is an add action
+            view_width += view_width_step;
+            view_width_step = view_width / 2;
+        } else if (view_width == view_width_step) {
+            // this is an sub action
+            // no need to do anything.
+            view_width_step = view_width / 2;
+        } else {
+            // user input value
+            // ceil view_width to power of 2
+            int user_view_width = view_width;
+            view_width = 1;
+            while (view_width < user_view_width) {
+                view_width <<= 1;
+            }
+            view_width_step = view_width / 2;
+        }
+
+        if (view_width_step == 0) {
+            view_width_step = 1;
+        }
+        if (view_width <= 0) {
+            view_width = 1;
         }
     }
     ImGui::SameLine();
     constexpr int step_by_1_u32 = 1;
+    constexpr int step_by_16_u32 = 16;
     ImGui::PushItemWidth(ImGui::CalcTextSize("[0xff]|+|-|Rows").x + ImGui::GetStyle().FramePadding.x * 2.0f);
-    ImGui::InputScalar("Row Count"_x, ImGuiDataType_U32, &view_height, &step_by_1_u32, &step_by_1_u32, "0x%x");
+    ImGui::InputScalar("Row Count"_x, ImGuiDataType_U32, &view_height, &step_by_1_u32, &step_by_16_u32, "0x%x");
 
 
     // input text to change view addr
-    constexpr uint64_t view_addr_step = 0x10;
-    constexpr uint64_t view_addr_step_fast = 0x1000;
+    const uint64_t view_addr_step = view_width;
+    const uint64_t view_addr_step_fast = view_width * 0x10;
     ImGui::SameLine();
     ImGui::PushItemWidth(ImGui::CalcTextSize("0x01234567890abcdef|+-|Memory Addrress").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     ImGui::InputScalar("Memory Address"_x, ImGuiDataType_U64, &view_addr, &view_addr_step, &view_addr_step_fast, "%016lX", ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsHexadecimal);
@@ -443,14 +315,12 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
                 // invalid data
                 data_str = std::format("{:>{}s}", "??", cell_width);
                 ImGui::TextUnformatted(data_str.c_str());
-                if (j != view_width - MemoryViewDisplayDataTypeWidth[display_data_type]) {
-                    ImGui::SameLine();
-                }
+                ImGui::SameLine();
                 continue;
             }
 
             // branch to editable memory
-            data_str = mem_view_data_to_str(remote_data + idx, display_hex, display_data_type);
+            data_str = raw_to_str_expr(remote_data + idx, display_hex, display_data_type);
 
             static bool need_to_copy_data_to_edit = false;
             if (edit_addr == addr) {
@@ -466,7 +336,7 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
                 }
                 int edit_flags = ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CallbackEdit | ImGuiInputTextFlags_EnterReturnsTrue;
                 if (ImGui::InputText("##edit_addr", &edit_data_str, edit_flags, memory_edit_callback, (void*)cell_width)) {
-                    std::vector<uint8_t> parsed_data = parse_mem_data(edit_data_str, display_hex, display_data_type);
+                    std::vector<uint8_t> parsed_data = str_expr_to_raw(edit_data_str, display_hex, display_data_type);
                     if (parsed_data.size() > 0 && memcmp(parsed_data.data(), remote_data + idx, parsed_data.size()) != 0) {
                         if (mem->write(addr, parsed_data) != parsed_data.size()) {
                             write_mem_err = {GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to write memory of process"_x, std::strerror(errno), addr)};
@@ -489,7 +359,22 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
                 need_to_copy_data_to_edit = true;
             }
 
-            if (j != view_width - MemoryViewDisplayDataTypeWidth[display_data_type]) {
+            ImGui::SameLine();
+        }
+
+        // render ascii
+        ImGui::Text(" | ");
+        ImGui::SameLine();
+
+        for (int k = 0; k < view_width; k++) {
+            int idx = i * view_width + k;
+            uint64_t addr = view_addr + idx;
+            if (idx >= mem_view->data().size()) {
+                ImGui::Text("?");
+            } else {
+                ImGui::Text("%c", remote_data[idx] >= 0x20 && remote_data[idx] < 0x7f ? remote_data[idx] : '.');
+            }
+            if (k != view_width - 1) {
                 ImGui::SameLine();
             }
         }
@@ -542,7 +427,9 @@ static void cheatng_show_memory_regions_imgui(ImguiRuntimeContext* ctx, bool& en
                 ImGui::TableSetColumnIndex(2);
                 ImGui::Text("%lX", region.size);
                 ImGui::TableSetColumnIndex(3);
+                ImGui::PushFont(ctx->hex_font);
                 ImGui::Text("%s", to_string(region.prot).c_str());
+                ImGui::PopFont();
                 ImGui::TableSetColumnIndex(4);
                 ImGui::Text("%016lX", region.file_offset);
                 ImGui::TableSetColumnIndex(5);
