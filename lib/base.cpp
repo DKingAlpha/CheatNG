@@ -4,17 +4,22 @@
 #include <string>
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 #include <format>
 
+static int MemoryViewDisplayDataTypeWidth[] = {
+    1, 2, 4, 8, 4, 8, 1, 2, 4, 8,
+};
+
 static const char* MemoryViewDisplayDataTypeNames[] = {
-    "u8", "u16", "u32", "u64", "f32", "f64", "s8", "s16", "s32", "s64", "C String",
+    "u8", "u16", "u32", "u64", "f32", "f64", "s8", "s16", "s32", "s64", "C String", "AoB"
 };
 
 static const char* MemoryViewDisplayDataTypeFormat[] = {
-    "{:4d}", "{:8d}", "{:16d}", "{:32d}", "{:20.10}", "{:40.20}", "{:4d}", "{:8d}", "{:16d}", "{:32d}",
+    "{:4d}", "{:8d}", "{:16d}", "{:32d}", "{:20.10}", "{:40.20}", "{:4d}", "{:8d}", "{:16d}", "{:32d}", "{:s}", "{:s}",
 };
 static const char* MemoryViewDisplayDataTypeFormatHex[] = {
-    "{:02X}", "{:04X}", "{:08X}", "{:016X}", "{:20.10}", "{:40.20}", "{:+03X}", "{:+05X}", "{:+09X}", "{:+017X}",
+    "{:02X}", "{:04X}", "{:08X}", "{:016X}", "{:20.10}", "{:40.20}", "{:+03X}", "{:+05X}", "{:+09X}", "{:+017X}", "{:s}", "{:s}"
 };
 
 static const char* MemoryViewDisplayDataTypeParseFormat[] = {
@@ -30,7 +35,12 @@ std::string data_type_name(MemoryViewDisplayDataType dt)
     return MemoryViewDisplayDataTypeNames[dt];
 }
 
-std::vector<uint8_t> str_expr_to_raw(std::string& data, bool hex, MemoryViewDisplayDataType dt)
+int data_type_size(MemoryViewDisplayDataType dt)
+{
+    return MemoryViewDisplayDataTypeWidth[dt];
+}
+
+std::vector<uint8_t> str_expr_to_raw(const std::string& data, bool hex, MemoryViewDisplayDataType dt)
 {
     std::vector<uint8_t> ret;
     if (data.empty()) {
@@ -97,11 +107,104 @@ std::vector<uint8_t> str_expr_to_raw(std::string& data, bool hex, MemoryViewDisp
             ret.resize(sizeof(int64_t));
             memcpy(ret.data(), &data_int, sizeof(int64_t));
         }
-    } else if (dt == MemoryViewDisplayDataType_cstr) {
-        ret.resize(data.size() + 1);
-        memcpy(ret.data(), data.c_str(), data.size() + 1);
+    } else if (dt == MemoryViewDisplayDataType_aob) {
+        std::string buf;
+        for (size_t i = 0; i < data.size(); i++) {
+            char c = data[i];
+            if (c != ' ') {
+                buf += c;
+                continue;
+            }
+            // handle buf
+            if (buf.size() == 1) {
+                buf = "0" + buf;
+            }
+            if (buf.size() != 2) {
+                // invalid
+                ret.clear();
+                return ret;
+            }
+            // XX / 0? / ??
+            if (buf == "0?" || buf == "??") {
+                ret.push_back('\0');
+            } else {
+                if(std::scanf(buf.c_str(), "%hhx", &c)) {
+                    ret.push_back(c);
+                } else {
+                    // invalid
+                    ret.clear();
+                    return ret;
+                }
+            }
+            buf.clear();
+        }
+    } else {
+        assert(false);
     }
     return ret;
+}
+
+bool encode_aob_pattern(std::string pattern, std::vector<uint8_t>& raw, std::vector<bool>& wildcard_mask)
+{
+    std::string ret;
+    std::string mask;
+
+    std::string buf;
+    for (size_t i = 0; i < pattern.size(); i++) {
+        char c = pattern[i];
+        if (c != ' ') {
+            buf += c;
+            continue;
+        }
+        // handle buf
+        if (buf.size() == 1) {
+            buf = "0" + buf;
+        }
+        if (buf.size() != 2) {
+            // invalid
+            return false;
+        }
+        // XX / 0? / ??
+        if (buf == "0?" || buf == "??") {
+            ret.push_back('\0');
+            mask.push_back(true);
+        } else {
+            if(std::scanf(buf.c_str(), "%hhx", &c)) {
+                ret.push_back(c);
+                mask.push_back(false);
+            } else {
+                // invalid
+                return false;
+            }
+        }
+        buf.clear();
+    }
+    raw = std::vector<uint8_t>(ret.begin(), ret.end());
+    wildcard_mask = std::vector<bool>(mask.begin(), mask.end());
+    return true;
+}
+
+
+bool decode_aob_pattern(std::string& pattern, const std::vector<uint8_t>& raw, const std::vector<bool>& wildcard_mask)
+{
+    if (wildcard_mask.size() != 0 && wildcard_mask.size() != raw.size()) {
+        return false;
+    }
+    pattern.clear();
+    for (size_t i = 0; i < raw.size(); i++) {
+        char buf[4] = {0};
+        char c = raw[i];
+        if (wildcard_mask.size() == 0 || wildcard_mask[i] == false) {
+            std::sprintf(buf, "%02X ", c);
+        } else {
+            std::sprintf(buf, "?? ");
+        }
+        pattern += buf;
+    }
+    if (pattern.size() > 0) {
+        pattern.pop_back(); // pop last space
+    }
+    return true;
 }
 
 std::string raw_to_str_expr(const uint8_t* ptr, bool hex, MemoryViewDisplayDataType dt)
@@ -147,8 +250,8 @@ std::string raw_to_str_expr(const uint8_t* ptr, bool hex, MemoryViewDisplayDataT
         int64_t data_int = 0;
         memcpy(&data_int, ptr, sizeof(int64_t));
         return std::vformat(data_fmt, std::make_format_args(data_int));
-    } else if (dt == MemoryViewDisplayDataType_cstr) {
-        return std::string((const char*)ptr);
+    } else {
+        assert(false);
     }
     return "";
 }

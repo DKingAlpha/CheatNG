@@ -58,10 +58,6 @@ struct GuiResult
     std::string message;
 };
 
-static int MemoryViewDisplayDataTypeWidth[] = {
-    1, 2, 4, 8, 4, 8, 1, 2, 4, 8,
-};
-
 static int MemoryViewDisplayDataTypeStrWidth[] = {
     4, 8, 16, 32, 20, 40, 4, 8, 16, 32,
 };
@@ -195,7 +191,7 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
     ImGui::PushItemWidth(ImGui::CalcTextSize("[f32]").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     static MemoryViewDisplayDataType display_data_type = MemoryViewDisplayDataType_u8;
     if (ImGui::BeginCombo("##view_data_type", data_type_name(display_data_type).c_str(), ImGuiComboFlags_NoArrowButton)) {
-        for (int i = 0; i < MemoryViewDisplayDataType_cstr; i++) {
+        for (int i = 0; i < MemoryViewDisplayDataType_BASE_MAX; i++) {
             if (ImGui::Selectable(data_type_name((MemoryViewDisplayDataType)i).c_str())) {
                 display_data_type = (MemoryViewDisplayDataType)i;
             }
@@ -296,10 +292,10 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
     int cell_width = display_hex ? MemoryViewDisplayDataTypeStrWidthHex[display_data_type] : MemoryViewDisplayDataTypeStrWidth[display_data_type];
     ImGui::Text(std::format("{:>18s}", "|").c_str());
     ImGui::SameLine();
-    for (int i = 0; i < view_width; i += MemoryViewDisplayDataTypeWidth[display_data_type]) {
+    for (int i = 0; i < view_width; i += data_type_size(display_data_type)) {
         std::string header_cell_text = std::format("{:>0{}X}", i + view_addr % view_width, cell_width);
         ImGui::TextUnformatted(header_cell_text.c_str());
-        if (i != view_width - MemoryViewDisplayDataTypeWidth[display_data_type]) {
+        if (i != view_width -data_type_size(display_data_type)) {
             ImGui::SameLine();
         }
     }
@@ -307,7 +303,7 @@ static GuiResult cheatng_select_process(ImguiRuntimeContext* ctx, int pid)
     for (int i = 0; i < view_height; i++) {
         ImGui::Text("%016lX |", view_addr + i * view_width);
         ImGui::SameLine();
-        for (int j = 0; j < view_width; j += MemoryViewDisplayDataTypeWidth[display_data_type]) {
+        for (int j = 0; j < view_width; j += data_type_size(display_data_type)) {
             int idx = i * view_width + j;
             uint64_t addr = view_addr + idx;
             std::string data_str;
@@ -490,15 +486,27 @@ static bool cheatng_imgui(ImguiRuntimeContext* ctx)
             ImGui::SetNextWindowSize(ImVec2(500, 440), ImGuiCond_FirstUseEver);
             ImGui::OpenPopup("Choose Process"_x);
         }
-        ImGui::SameLine();
 
+        ImGui::SameLine();
         static bool show_memory_regions = false;
         if (opened_pid >= 0) {
             if (ImGui::Button("Ⓜ️")) {
                 show_memory_regions = true;
             }
             cheatng_show_memory_regions_imgui(ctx, show_memory_regions);
+
+            ImGui::SameLine();
+            if (ImGui::Button("🔍")) {
+                ImGui::OpenPopup("Search Memory"_x);
+            }
+
+            ImGui::SameLine();
+            if (ImGui::Button("🔧")) {
+                ImGui::OpenPopup("Settings"_x);
+            }
         }
+
+
         //// choose process modal
         static std::set<int> interested_pids;
         static bool show_kthread = false;

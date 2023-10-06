@@ -26,6 +26,8 @@ inline constexpr TranslationLine translations_table[] = {
     {"🔎 Search Process", "🔎 搜索进程"},
     {"🔎 Search Module", "🔎 搜索模块"},
     {"Choose Process", "选择进程"},
+    {"Search Mmeory", "搜索内存"},
+    {"Settings", "设置"},
     {"Process List", "进程列表"},
     {"Show Kernel Threads", "显示内核线程"},
     {"Parent Process", "父进程"},
