@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <set>
+#include <map>
 
 #include "imgui.h"
 #include "proc.hpp"
@@ -62,9 +62,10 @@ class CheatNGGUI
 
 public:
     CheatNGGUI(ImVec4 clear_color, ImFont* hex_font) : clear_color(clear_color), hex_font(hex_font), io(&ImGui::GetIO()),
-        pid(-1), view_addr(0), view_width(16), view_height(16),
         is_process_list_open(false), is_memory_editor_open(false), is_memory_regions_open(false), is_memory_search_open(false), is_settings_open(false)
-        {}
+        {
+            reset_process();
+        }
 
     bool tick();
 
@@ -86,6 +87,17 @@ private:
 
     GuiResult update_process(bool update_proc, bool update_mem_regions, bool auto_set_range, bool update_mem_view);
 
+    void reset_process() {
+        pid = -1;
+        view_addr = 0;
+        view_width = 16;
+        view_height = 16;
+        proc.reset();
+        mem.reset();
+        mem_regions.reset();
+        mem_view.reset();
+    }
+
 private:
-    std::set<GuiResult> results;
+    std::map<int, GuiResult> results;
 };

@@ -86,7 +86,7 @@ bool CheatNGGUI::tick_update_process()
         last_pid = pid;
         GuiResult result = update_process(true, true, true, true);
         if (result.action != GuiResultAction_OK) {
-            results.insert(result);
+            results[__LINE__] = result;
         }
         if (result.action & GuiResultAction_CloseRemoteProcess) {
             return false;
@@ -99,7 +99,7 @@ bool CheatNGGUI::tick_update_process()
         last_update_time_region = current_time;
         GuiResult result = update_process(false, true, false, false);
         if (result.action != GuiResultAction_OK) {
-            results.insert(result);
+            results[__LINE__] = result;
         }
         if (result.action & GuiResultAction_CloseRemoteProcess) {
             return false;
@@ -111,7 +111,7 @@ bool CheatNGGUI::tick_update_process()
         last_update_time_view = current_time;
         GuiResult result = update_process(false, false, false, true);
         if (result.action != GuiResultAction_OK) {
-            results.insert(result);
+            results[__LINE__] = result;
         }
         if (result.action & GuiResultAction_CloseRemoteProcess) {
             return false;
@@ -188,14 +188,14 @@ bool CheatNGGUI::show_memory_editor()
     ImGui::PushItemWidth(ImGui::CalcTextSize("[0xff]|+|-|Rows").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     ImGui::InputScalar("Row Count"_x, ImGuiDataType_U32, &view_height, &step_by_1_u32, &step_by_16_u32, "0x%x");
 
-    show_results();
-
     // input text to change view addr
     const uint64_t view_addr_step = view_width;
     const uint64_t view_addr_step_fast = view_width * 0x10;
     ImGui::SameLine();
     ImGui::PushItemWidth(ImGui::CalcTextSize("0x01234567890abcdef|+-|Memory Addrress").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     ImGui::InputScalar("Memory Address"_x, ImGuiDataType_U64, &view_addr, &view_addr_step, &view_addr_step_fast, "%016lX", ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsHexadecimal);
+
+    show_results();
 
     // render data
     ImGui::PushFont(hex_font);
@@ -261,10 +261,10 @@ bool CheatNGGUI::show_memory_editor()
                     std::vector<uint8_t> parsed_data = str_expr_to_raw(edit_data_str, display_hex, display_data_type);
                     if (parsed_data.size() > 0 && memcmp(parsed_data.data(), remote_data + idx, parsed_data.size()) != 0) {
                         if (mem->write(addr, parsed_data) != parsed_data.size()) {
-                            results.insert({GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to write memory of process"_x, std::strerror(errno), addr)});
+                            results[__LINE__] = {GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to write memory of process"_x, std::strerror(errno), addr)};
                         }
                     } else {
-                        results.insert({GuiResultAction_Error, std::format("{}: {}. errno: {}", "Invalid input"_x, edit_data_str, std::strerror(errno))});
+                        results[__LINE__] = {GuiResultAction_Error, std::format("{}: {}. errno: {}", "Invalid input"_x, edit_data_str, std::strerror(errno))};
                     }
                     edit_addr = 0;
                     edit_data_str.clear();
@@ -468,10 +468,14 @@ GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, 
     return {GuiResultAction_OK, ""};
 }
 
-
 bool CheatNGGUI::open_process()
 {
-    auto result = update_process(true, true, true, true);
+    static GuiResult result = {GuiResultAction_OK, "" };
+    static int last_pid = -1;
+    if (last_pid != pid) {
+        last_pid = pid;
+        result = update_process(true, true, true, true);
+    }
     bool popup_msg_open = true;
     if (result.action & GuiResultAction_CloseRemoteProcess) {
         const char* popup_title = (result.action & GuiResultAction_Warn) ? "⚠️ Warning"_x : "⛔ Error"_x;
@@ -486,9 +490,12 @@ bool CheatNGGUI::open_process()
         }
         ImGui::OpenPopup(popup_title);
         if (!popup_msg_open) {
+            result = { GuiResultAction_OK, "" };
+            last_pid = -1;
             ImGui::OpenPopup("Choose Process"_x);
+            return false;
         }
-        return false;
+        return true;
     }
     return true;
 }
@@ -591,15 +598,13 @@ bool CheatNGGUI::show_process_list()
         selected_pid = -1;
     }
 
-    if (opened_pid && opened_pid >= 0) {
+    if (opened_pid >= 0) {
         pid = opened_pid;
-        bool retval = open_process();
+        auto retval = open_process();
         if (!retval) {
-            pid = -1;
-            view_addr = 0;
             opened_pid = -1;
             selected_pid = -1;
-            ImGui::OpenPopup("Choose Process"_x);
+            reset_process();
         }
         return retval;
     }
@@ -609,9 +614,20 @@ bool CheatNGGUI::show_process_list()
 
 bool CheatNGGUI::show_results()
 {
+    /*
+    ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(ImGui::GetWindowWidth(), 120));
+    if(!ImGui::BeginChild("##log results")) {
+        ImGui::EndChild();
+        return true;
+    }
+    */
+
+    if (ImGui::Button("Clear All"_x)) {
+        results.clear();
+    }
     for (auto it = results.begin(); it != results.end(); ) {
-        auto err = *it;
-        if (err.action != GuiResultAction_OK) {
+        auto err = it->second;
+        if (err.action == GuiResultAction_OK) {
             it = results.erase(it);
         } else {
             if (err.action & GuiResultAction_Warn) {
@@ -638,6 +654,7 @@ bool CheatNGGUI::show_results()
             it++;
         }
     }
+    ImGui::EndChild();
     return true;
 }
 

@@ -57,6 +57,7 @@ inline constexpr TranslationLine translations_table[] = {
     {"Copy Name", "复制名称"},
     {"Bytes Per Row", "每行宽度"},
     {"Row Count", "行数"},
+    {"Clear All", "清除所有"},
 };
 
 inline constexpr const char* const* get_translation_line(const char* str, std::size_t len)
