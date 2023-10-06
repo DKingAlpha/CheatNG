@@ -188,11 +188,8 @@ int main(int, char**)
     ImFont* hex_font = io.Fonts->AddFontFromFileTTF("../main/fonts/NotoSansMono-Regular.ttf", 20.0f);
 
     // Our state
-    ImguiRuntimeContext ctx = {
-        .clear_color = ImVec4(0.45f, 0.55f, 0.60f, 0.00f),
-        .io = &io,
-        .hex_font = hex_font,
-    };
+    CheatNGGUI ctx { ImVec4(0.45f, 0.55f, 0.60f, 0.00f), hex_font };
+
     // Main loop
 #ifdef __EMSCRIPTEN__
     // For an Emscripten build we are disabling file-system access, so let's not
@@ -221,7 +218,7 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        if(!gui_imgui(&ctx)) {
+        if(!ctx.tick()) {
             glfwSetWindowShouldClose(window, true);
         }
 
@@ -230,7 +227,8 @@ int main(int, char**)
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(ctx.clear_color.x * ctx.clear_color.w, ctx.clear_color.y * ctx.clear_color.w, ctx.clear_color.z * ctx.clear_color.w, ctx.clear_color.w);
+        auto clear_color = ctx.get_clear_color();
+        glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
