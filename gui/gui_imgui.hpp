@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <thread>
 
 #include "imgui.h"
 #include "mem.hpp"
@@ -34,6 +35,23 @@ struct CheatNGConfig
     MemoryImpType memory_imp_type;
 };
 
+struct SearchTask
+{
+    std::string name;
+    std::string value;
+    MemoryViewDisplayDataType data_type;
+    bool is_searching;
+    uint64_t search_start;
+    uint64_t search_end;
+    std::vector<uint64_t> results;
+    std::unique_ptr<std::thread> search_thread;
+    MemoryViewCache cache;
+
+    SearchTask(std::string name) :name(name) , data_type(MemoryViewDisplayDataType_s32), is_searching(false), search_start(0), search_end(0x7fffffffffffffff) {}
+
+    void clear() { results.clear(); cache.clear();}
+};
+
 class CheatNGGUI
 {
     ImVec4 clear_color;
@@ -48,8 +66,10 @@ class CheatNGGUI
     int view_height;
     std::unique_ptr<IProcess> proc;
     std::unique_ptr<IMemory> mem;
-    std::unique_ptr<MemoryView> mem_view;
+    std::unique_ptr<MemoryViewRange> mem_view;
     std::unique_ptr<MemoryRegions> mem_regions;
+    int selected_task_index;
+    std::vector<SearchTask> search_tasks;
 
     // window states
     bool is_process_list_open;
@@ -62,7 +82,7 @@ class CheatNGGUI
     CheatNGConfig config;
 
 public:
-    CheatNGGUI(ImVec4 clear_color, ImFont* hex_font) : clear_color(clear_color), hex_font(hex_font), io(&ImGui::GetIO())
+    CheatNGGUI(ImVec4 clear_color, ImFont* hex_font) : clear_color(clear_color), hex_font(hex_font), io(&ImGui::GetIO()), selected_task_index(0)
     {
         reset_process();
         reset_sub_windows();
@@ -80,6 +100,9 @@ private:
     bool show_memory_search();
     bool show_settings();
     bool show_results();
+
+    // components
+    bool show_select_datatype(MemoryViewDisplayDataType& dt);
 
     GuiResult update_process(bool update_proc, bool update_mem_regions, bool auto_set_range, bool update_mem_view);
     bool tick_update_process();

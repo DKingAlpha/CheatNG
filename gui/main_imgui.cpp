@@ -176,19 +176,19 @@ int main(int, char**)
     }
     ranges.push_back(0);
     font_cfg.GlyphRanges = ranges.data();
-    ImFont* cn_fonts = io.Fonts->AddFontFromFileTTF("../main/fonts/NotoSansCJK-Regular.ttc", 24.0f, &font_cfg, nullptr);
+    ImFont* cn_fonts = io.Fonts->AddFontFromFileTTF("../gui/fonts/NotoSansCJK-Regular.ttc", 24.0f, &font_cfg, nullptr);
 
     ImWchar emoji_ranges[] = {0x1, 0x1FFFF, 0};
     ImFontConfig emoji_cfg;
     emoji_cfg.OversampleH = emoji_cfg.OversampleV = 1;
     emoji_cfg.MergeMode = true;
     emoji_cfg.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
-    ImFont* emoji_fonts = io.Fonts->AddFontFromFileTTF("../main/fonts/TwitterColorEmoji-SVGinOT.ttf", 24.0f, &emoji_cfg, emoji_ranges);
+    ImFont* emoji_fonts = io.Fonts->AddFontFromFileTTF("../gui/fonts/TwitterColorEmoji-SVGinOT.ttf", 24.0f, &emoji_cfg, emoji_ranges);
 
-    ImFont* hex_font = io.Fonts->AddFontFromFileTTF("../main/fonts/NotoSansMono-Regular.ttf", 20.0f);
+    ImFont* hex_font = io.Fonts->AddFontFromFileTTF("../gui/fonts/NotoSansMono-Regular.ttf", 20.0f);
 
     // Our state
-    CheatNGGUI ctx { ImVec4(0.45f, 0.55f, 0.60f, 0.00f), hex_font };
+    CheatNGGUI ctx{ImVec4(0.45f, 0.55f, 0.60f, 0.00f), hex_font};
 
     // Main loop
 #ifdef __EMSCRIPTEN__
@@ -218,7 +218,7 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        if(!ctx.tick()) {
+        if (!ctx.tick()) {
             glfwSetWindowShouldClose(window, true);
         }
 
@@ -232,8 +232,7 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-        {
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
             GLFWwindow* backup_current_context = glfwGetCurrentContext();
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault();

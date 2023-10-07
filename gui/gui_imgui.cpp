@@ -119,6 +119,21 @@ bool CheatNGGUI::tick_update_process()
     return true;
 }
 
+bool CheatNGGUI::show_select_datatype(MemoryViewDisplayDataType& dt)
+{
+    ImGui::PushItemWidth(ImGui::CalcTextSize("[f32]").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+    if (ImGui::BeginCombo("##view_data_type", data_type_name(dt).c_str(), ImGuiComboFlags_NoArrowButton)) {
+        for (int i = 0; i < MemoryViewDisplayDataType_BASE_MAX; i++) {
+            if (ImGui::Selectable(data_type_name((MemoryViewDisplayDataType)i).c_str())) {
+                dt = (MemoryViewDisplayDataType)i;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::PopItemWidth();
+    return true;
+}
+
 bool CheatNGGUI::show_memory_editor()
 {
     if (!is_memory_editor_open) {
@@ -135,17 +150,8 @@ bool CheatNGGUI::show_memory_editor()
     }
 
     // combo to select data types
-    ImGui::PushItemWidth(ImGui::CalcTextSize("[f32]").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     static MemoryViewDisplayDataType display_data_type = MemoryViewDisplayDataType_u8;
-    if (ImGui::BeginCombo("##view_data_type", data_type_name(display_data_type).c_str(), ImGuiComboFlags_NoArrowButton)) {
-        for (int i = 0; i < MemoryViewDisplayDataType_BASE_MAX; i++) {
-            if (ImGui::Selectable(data_type_name((MemoryViewDisplayDataType)i).c_str())) {
-                display_data_type = (MemoryViewDisplayDataType)i;
-            }
-        }
-        ImGui::EndCombo();
-    }
-    ImGui::PopItemWidth();
+    show_select_datatype(display_data_type);
     // display in hex
     static bool display_hex = true;
     ImGui::SameLine();
@@ -388,6 +394,187 @@ bool CheatNGGUI::show_memory_search()
     }
     ImGui::SetNextWindowSize(ImVec2(1280, 600), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Search Memory"_x, &is_memory_search_open)) {
+        if (search_tasks.empty()) {
+            search_tasks.push_back(SearchTask(std::format("{}_{}", "Task"_x, search_tasks.size() + 1)));
+        }
+        if (selected_task_index >= search_tasks.size()) {
+            // fix bad index
+            selected_task_index = search_tasks.size() - 1;
+        }
+        ImGui::SetNextItemWidth(ImGui::CalcTextSize("New Search Name"_x).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        std::string new_task_name = "";
+        if (ImGui::InputTextWithHint("##New Search Name", "New Search Name"_x, &new_task_name, ImGuiInputTextFlags_EnterReturnsTrue)) {
+            if (new_task_name.empty()) {
+                new_task_name = std::format("{}_{}", "Task"_x, search_tasks.size() + 1);
+            }
+            search_tasks.push_back(SearchTask(new_task_name));
+        }
+        ImGui::SameLine();
+        ImGui::Spacing();
+        ImGui::SameLine();
+        if (ImGui::BeginTable("##Search Tasks List", search_tasks.size(), ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingFixedFit)) {
+            for (size_t i = 0; i < search_tasks.size(); i++) {
+                auto& task = search_tasks[i];
+                ImGui::TableNextColumn();
+                if (ImGui::Selectable(task.name.c_str(), selected_task_index == i)) {
+                    selected_task_index = i;
+                }
+                static size_t hovered_id = selected_task_index;
+                if (ImGui::IsItemHovered()) {
+                    hovered_id = i;
+                }
+                std::string text_id = std::format("##Search Task {} {}", task.name, i);
+                if (ImGui::BeginPopupContextWindow(text_id.c_str())) {
+                    if (ImGui::MenuItem("Delete"_x) && !search_tasks[hovered_id].is_searching) {
+                        search_tasks.erase(search_tasks.begin() + hovered_id);
+                        if (selected_task_index >= search_tasks.size() && search_tasks.size() > 0) {
+                            selected_task_index = search_tasks.size() - 1;
+                        }
+                        if (selected_task_index < 0) {
+                            selected_task_index = 0;
+                            search_tasks.push_back(SearchTask(std::format("{}_{}", "Task"_x, search_tasks.size() + 1)));
+                        }
+                    }
+                    ImGui::EndPopup();
+                }
+            }
+            ImGui::EndTable();
+        }
+
+        ImGui::Separator();
+
+        SearchTask& task = search_tasks[selected_task_index];
+
+        ImGui::Text("Search Range"_x);
+        ImGui::SameLine();
+        std::string search_addr_begin = std::format("{:016X}", task.search_start);
+        std::string search_addr_end = std::format("{:016X}", task.search_end);
+        ImGui::SetNextItemWidth(ImGui::CalcTextSize("0123456789abcdef"_x).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        if (ImGui::InputText("##Search Address Begin"_x, &search_addr_begin, ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsUppercase)) {
+            uint64_t addr = 0;
+            if (std::sscanf(search_addr_begin.c_str(), "%lX", &addr) == 1) {
+                task.search_start = addr;
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text(" - ");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::CalcTextSize("0123456789abcdef"_x).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        if (ImGui::InputText("##Search Address End"_x, &search_addr_end, ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_CharsUppercase)) {
+            uint64_t addr = 0;
+            if (std::sscanf(search_addr_end.c_str(), "%lX", &addr) == 1) {
+                task.search_end = addr;
+            }
+        }
+
+        show_select_datatype(task.data_type);
+        static bool search_hex = false;
+        ImGui::SameLine();
+        ImGui::Checkbox("Search Hex"_x, &search_hex);
+        ImGui::SameLine();
+
+        bool search_pattern_flags = ImGuiInputTextFlags_EnterReturnsTrue;
+        if (task.is_searching) {
+            search_pattern_flags |= ImGuiInputTextFlags_ReadOnly;
+        }
+        ImGui::SetNextItemWidth(ImGui::CalcTextSize("🔎 Search Memory"_x).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        ImGui::InputTextWithHint("##Search Memory", "🔎 Search Memory"_x, &task.value);
+        ImGui::SameLine();
+
+        static std::mutex mtx_add_result;
+
+        if (task.is_searching) {
+            if (ImGui::Button("Stop Search"_x)) {
+                task.is_searching = false;
+                if (task.search_thread && task.search_thread->joinable()) {
+                    task.search_thread->join();
+                }
+                task.search_thread.reset();
+            }
+        }
+        if (!task.is_searching) {
+            size_t result_count = 0;
+            mtx_add_result.lock();
+            result_count = task.results.size();
+            mtx_add_result.unlock();
+            if (result_count == 0) {
+                if (ImGui::Button("Start Search"_x)) {
+                    // new search
+                    task.is_searching = true;
+                    task.clear();
+                    if (task.search_thread && task.search_thread->joinable()) {
+                        task.search_thread->join();
+                    }
+                    task.search_thread.reset(new std::thread([this, &task]() {
+                        SearchMemory::begin_search(mem, task.is_searching, search_hex, task.value, task.data_type, task.search_start, task.search_end, [&task](uint64_t addr) -> bool {
+                            mtx_add_result.lock();
+                            task.results.push_back(addr);
+                            mtx_add_result.unlock();
+                            return true;
+                        });
+                        task.is_searching = false;
+                    }));
+                }
+            } else {
+                if (ImGui::Button("Continue Search"_x)) {
+                    // continue search
+                    task.is_searching = true;
+                    if (task.search_thread && task.search_thread->joinable()) {
+                        task.search_thread->join();
+                    }
+                    task.search_thread.reset(new std::thread([this, &task]() {
+                        std::vector<uint64_t> prev_results = std::move(task.results);
+                        task.clear();
+                        SearchMemory::continue_search(mem, task.is_searching, search_hex, task.value, task.data_type, prev_results, [&task](uint64_t addr) -> bool {
+                            mtx_add_result.lock();
+                            task.results.push_back(addr);
+                            mtx_add_result.unlock();
+                            return true;
+                        });
+                        task.is_searching = false;
+                    }));
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Clear Results"_x)) {
+                    task.clear();
+                }
+            }
+        }
+
+        if (ImGui::BeginChild("##Search Results", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+            std::string search_result_title = std::format("{}: {}", "Total"_x, task.results.size());
+            ImGui::Text(search_result_title.c_str());
+            ImGui::SameLine();
+            if (ImGui::Button("Clear"_x)) {
+                task.clear();
+            }
+            static bool show_hex = false;
+            ImGui::SameLine();
+            ImGui::Checkbox("Show Hex"_x, &show_hex);
+            ImGui::Separator();
+            ImGui::BeginChild("##Search Results List", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysAutoResize);
+            mtx_add_result.lock();
+            int data_size = data_type_size(task.data_type);
+            task.cache.update_data_size(data_size);
+            for (auto addr : task.results) {
+                std::string value_str;
+                auto [valid, buf] = task.cache.get(mem, addr, data_size);
+                if (valid) {
+                    value_str = raw_to_str_expr(buf.data(), show_hex, task.data_type);
+                    if (task.data_type < MemoryViewDisplayDataType_BASE_MAX && value_str.size() && value_str[0] == '+') {
+                        // strip the leading '+' sign
+                        value_str = value_str.substr(1);
+                    }
+                } else {
+                    value_str = "??";
+                }
+                std::string display_addr = std::format("{:016X} {}", addr, value_str);
+                ImGui::Selectable(display_addr.c_str());
+            }
+            mtx_add_result.unlock();
+            ImGui::EndChild();
+        }
+        ImGui::EndChild();
     }
     ImGui::End();
     return true;
@@ -416,7 +603,7 @@ GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, 
         mem.reset();
         mem = Factory::create(config.memory_imp_type, pid);
         mem_view.reset();
-        mem_view = std::make_unique<MemoryView>();
+        mem_view = std::make_unique<MemoryViewRange>();
     }
 
     if (update_mem_regions && mem) {
@@ -439,13 +626,13 @@ GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, 
         for (auto region : mem_regions->search_all(main_keyword)) {
             if (region->prot & MemoryProtectionFlags::EXECUTE) {
                 view_addr = region->start;
-                mem_view->set_range(view_addr, view_width * view_height);
+                mem_view->set(view_addr, view_width * view_height);
                 found_main = true;
                 break;
             }
         }
         if (!found_main) {
-            mem_view->set_range(mem_regions->begin()->start, mem_regions->begin()->size);
+            mem_view->set(mem_regions->begin()->start, mem_regions->begin()->size);
         }
 
         if (!mem_view->update(mem)) {
@@ -454,7 +641,7 @@ GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, 
     }
 
     if (update_mem_view && mem_view) {
-        mem_view->set_range(view_addr, view_width * view_height);
+        mem_view->set(view_addr, view_width * view_height);
         if (!mem_view->update(mem)) {
             return {GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to read memory of process"_x, std::strerror(errno), mem_view->start())};
         }
@@ -732,7 +919,6 @@ bool CheatNGGUI::show_main_panel()
             reset_sub_windows();
         }
         show_results();
-
     }
     ImGui::End();
     return main_window_open;

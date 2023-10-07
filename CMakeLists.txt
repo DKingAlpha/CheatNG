@@ -74,12 +74,12 @@ add_library(mem STATIC ${SOURCES_LIB})
 target_include_directories(mem PUBLIC ${HEADER_DIRS_LIB})
 
 
-# main
-file(GLOB_RECURSE SOURCES_MAIN "main/*.cpp")
-set(HEADER_DIRS_MAIN "main")
+# gui
+file(GLOB_RECURSE SOURCES_GUI "gui/*.cpp")
+set(HEADER_DIRS_GUI "gui")
 
-add_executable(CheatNG ${SOURCES_MAIN})
-target_include_directories(CheatNG PUBLIC ${HEADER_DIRS_MAIN} ${HEADER_DIRS_LIB} ${HEADER_DIRS_IMGUI} ${HEADER_DIRS_GLFW})
+add_executable(CheatNG ${SOURCES_GUI})
+target_include_directories(CheatNG PUBLIC ${HEADER_DIRS_GUI} ${HEADER_DIRS_LIB} ${HEADER_DIRS_IMGUI} ${HEADER_DIRS_GLFW})
 target_link_libraries(CheatNG imgui mem ${IMGUI_LIBRARIES})
 target_compile_definitions(CheatNG PRIVATE ${IMGUI_DEFINITIONS})
 

@@ -1,26 +1,22 @@
 #include "base.hpp"
 
-#include <vector>
-#include <string>
-#include <stdint.h>
-#include <string.h>
 #include <assert.h>
 #include <format>
+#include <stdint.h>
+#include <string.h>
+#include <string>
+#include <vector>
 
 static int MemoryViewDisplayDataTypeWidth[] = {
     1, 2, 4, 8, 4, 8, 1, 2, 4, 8,
 };
 
-static const char* MemoryViewDisplayDataTypeNames[] = {
-    "u8", "u16", "u32", "u64", "f32", "f64", "s8", "s16", "s32", "s64", "C String", "AoB"
-};
+static const char* MemoryViewDisplayDataTypeNames[] = {"u8", "u16", "u32", "u64", "f32", "f64", "s8", "s16", "s32", "s64", "C String", "AoB"};
 
 static const char* MemoryViewDisplayDataTypeFormat[] = {
     "{:4d}", "{:8d}", "{:16d}", "{:32d}", "{:20.10}", "{:40.20}", "{:4d}", "{:8d}", "{:16d}", "{:32d}", "{:s}", "{:s}",
 };
-static const char* MemoryViewDisplayDataTypeFormatHex[] = {
-    "{:02X}", "{:04X}", "{:08X}", "{:016X}", "{:20.10}", "{:40.20}", "{:+03X}", "{:+05X}", "{:+09X}", "{:+017X}", "{:s}", "{:s}"
-};
+static const char* MemoryViewDisplayDataTypeFormatHex[] = {"{:02X}", "{:04X}", "{:08X}", "{:016X}", "{:20.10}", "{:40.20}", "{:+03X}", "{:+05X}", "{:+09X}", "{:+017X}", "{:s}", "{:s}"};
 
 static const char* MemoryViewDisplayDataTypeParseFormat[] = {
     "%hhd", "%hd", "%d", "%ld", "%f", "%lf", "%hhd", "%hd", "%d", "%ld",
@@ -29,16 +25,9 @@ static const char* MemoryViewDisplayDataTypeParseFormatHex[] = {
     "%hhx", "%hx", "%x", "%lx", "%f", "%lf", "%hhx", "%hx", "%x", "%lx",
 };
 
+std::string data_type_name(MemoryViewDisplayDataType dt) { return MemoryViewDisplayDataTypeNames[dt]; }
 
-std::string data_type_name(MemoryViewDisplayDataType dt)
-{
-    return MemoryViewDisplayDataTypeNames[dt];
-}
-
-int data_type_size(MemoryViewDisplayDataType dt)
-{
-    return MemoryViewDisplayDataTypeWidth[dt];
-}
+int data_type_size(MemoryViewDisplayDataType dt) { return MemoryViewDisplayDataTypeWidth[dt]; }
 
 std::vector<uint8_t> str_expr_to_raw(const std::string& data, bool hex, MemoryViewDisplayDataType dt)
 {
@@ -128,7 +117,7 @@ std::vector<uint8_t> str_expr_to_raw(const std::string& data, bool hex, MemoryVi
             if (buf == "0?" || buf == "??") {
                 ret.push_back('\0');
             } else {
-                if(std::scanf(buf.c_str(), "%hhx", &c)) {
+                if (std::scanf(buf.c_str(), "%hhx", &c)) {
                     ret.push_back(c);
                 } else {
                     // invalid
@@ -169,7 +158,7 @@ bool encode_aob_pattern(std::string pattern, std::vector<uint8_t>& raw, std::vec
             ret.push_back('\0');
             mask.push_back(true);
         } else {
-            if(std::scanf(buf.c_str(), "%hhx", &c)) {
+            if (std::scanf(buf.c_str(), "%hhx", &c)) {
                 ret.push_back(c);
                 mask.push_back(false);
             } else {
@@ -183,7 +172,6 @@ bool encode_aob_pattern(std::string pattern, std::vector<uint8_t>& raw, std::vec
     wildcard_mask = std::vector<bool>(mask.begin(), mask.end());
     return true;
 }
-
 
 bool decode_aob_pattern(std::string& pattern, const std::vector<uint8_t>& raw, const std::vector<bool>& wildcard_mask)
 {

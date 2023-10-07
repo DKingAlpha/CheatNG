@@ -2,16 +2,17 @@
 
 #include "base.hpp"
 #include "mem.hpp"
-#include <memory>
-#include <functional>
 #include <assert.h>
+#include <functional>
+#include <map>
+#include <memory>
 
-class MemoryView
+class MemoryViewRange
 {
 public:
-    MemoryView() : _view_start(0), _view_size(0) {}
+    MemoryViewRange() : _view_start(0), _view_size(0) {}
 
-    void set_range(uint64_t start, uint64_t size)
+    void set(uint64_t start, uint64_t size)
     {
         _view_start = start;
         _view_size = size;
@@ -35,6 +36,54 @@ private:
     std::vector<uint8_t> _view_data;
 };
 
+class MemoryViewCache
+{
+    struct CacheData
+    {
+        bool valid;
+        double last_update_time;
+        std::vector<uint8_t> data;
+    };
+
+public:
+    MemoryViewCache() : data_size(0), refresh_time(1.0) {}
+    MemoryViewCache(int data_size, double refresh_time = 1.0) : data_size(data_size), refresh_time(refresh_time) {}
+
+    void clear() { data.clear(); }
+
+    void update_data_size(int data_size)
+    {
+        if (this->data_size != data_size) {
+            data.clear();
+            this->data_size = data_size;
+        }
+    }
+
+    void add(std::vector<uint64_t>& addrs)
+    {
+        for (size_t i = 0; i < addrs.size(); i++) {
+            data[addrs[i]] = {false, 0.0, {}};
+        }
+    }
+
+    std::pair<bool, std::vector<uint8_t>> get(const std::unique_ptr<IMemory>& mem, uint64_t addr, double current_time)
+    {
+        auto it = data.find(addr);
+        if (it == data.end() || current_time - it->second.last_update_time > refresh_time) {
+            std::vector<uint8_t> buf;
+            bool valid = mem->read(addr, data_size, buf) == data_size;
+            data[addr] = {valid, current_time, buf};
+            return {valid, buf};
+        } else {
+            return {it->second.valid, it->second.data};
+        }
+    }
+
+    double refresh_time;
+    int data_size;
+    std::map<uint64_t, CacheData> data;
+};
+
 class SearchMemory
 {
 public:
@@ -43,9 +92,10 @@ public:
     class Pattern : public IValidBoolOp
     {
     public:
-        Pattern(const std::string& str_expr, MemoryViewDisplayDataType data_type) : data_type_(data_type) {
+        Pattern(const std::string& str_expr, MemoryViewDisplayDataType data_type, bool hex) : data_type_(data_type)
+        {
             if (data_type < MemoryViewDisplayDataType_BASE_MAX) {
-                raw = str_expr_to_raw(str_expr, true, data_type);
+                raw = str_expr_to_raw(str_expr, hex, data_type);
             } else if (data_type == MemoryViewDisplayDataType_cstr) {
                 raw.resize(str_expr.size());
                 memcpy(raw.data(), str_expr.data(), str_expr.size());
@@ -79,32 +129,33 @@ public:
         MemoryViewDisplayDataType data_type() const { return data_type_; }
         bool is_valid() const override { return data_size() > 0; }
 
-private:
+    private:
         MemoryViewDisplayDataType data_type_;
         std::vector<uint8_t> raw;
         std::vector<bool> wildcard;
     };
 
-    std::vector<uint64_t> search(const std::unique_ptr<IMemory>& mem, const std::string pattern_str, MemoryViewDisplayDataType data_type,
-        uint64_t start, uint64_t end, FoundCallback on_found) const
+    static bool begin_search(const std::unique_ptr<IMemory>& mem, bool& stay_running, bool hex, const std::string pattern_str, MemoryViewDisplayDataType data_type, uint64_t start, uint64_t end, FoundCallback on_found)
     {
-        std::vector<uint64_t> ret;
-        Pattern pattern(pattern_str, data_type);
+        Pattern pattern(pattern_str, data_type, hex);
         if (!pattern) {
-            return ret;
+            return false;
         }
         size_t pattern_size = pattern.data_size();
-        size_t search_alignment = pattern.data_size();
-        for(auto& region : mem->regions()) {
+        size_t search_alignment = data_type_size(pattern.data_type());
+        for (auto& region : mem->regions()) {
+            if (!stay_running) {
+                break;
+            }
             if (region.start < start || region.start + region.size > end) {
                 continue;
             }
-            MemoryView view;
-            view.set_range(region.start, region.size);
+            MemoryViewRange view;
+            view.set(region.start, region.size);
             if (!view.update(mem)) {
                 continue;
             }
-            
+
             auto start_addr = view.start();
             auto offset = start_addr % search_alignment;
             if (offset != 0) {
@@ -112,15 +163,44 @@ private:
             }
 
             auto& data = view.data();
-            for (size_t i=offset; i <= data.size() - pattern_size; i+= search_alignment) {
+            for (size_t i = offset; i <= data.size() - pattern_size; i += search_alignment) {
+                if (!stay_running) {
+                    break;
+                }
                 if (pattern.is_match(data.data() + i)) {
                     uint64_t addr = region.start + i;
-                    if (on_found(addr)) {
-                        ret.push_back(addr);
+                    if (!on_found(addr)) {
+                        return false;
                     }
                 }
             }
         }
-        return ret;
+        return true;
+    }
+
+    static bool continue_search(const std::unique_ptr<IMemory>& mem, bool& stay_running, bool hex, const std::string pattern_str, MemoryViewDisplayDataType data_type, const std::vector<uint64_t>& search_in_addresses, FoundCallback on_found)
+    {
+        Pattern pattern(pattern_str, data_type, hex);
+        if (!pattern) {
+            return false;
+        }
+        size_t pattern_size = pattern.data_size();
+        size_t search_alignment = data_type_size(pattern.data_type());
+        for (uint64_t addr : search_in_addresses) {
+            if (!stay_running) {
+                break;
+            }
+            std::vector<uint8_t> buf;
+            ssize_t read_bytes = mem->read(addr, pattern_size, buf);
+            if (read_bytes != pattern_size) {
+                continue;
+            }
+            if (pattern.is_match(buf.data())) {
+                if (!on_found(addr)) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 };
