@@ -44,7 +44,7 @@ inline constexpr TranslationLine translations_table[] = {
     {"Jump To Children", "跳转到子进程"},
     {"OK", "确定"},
     {"Delete", "删除"},
-    {"Clear", "清除"},
+    {"Clear", "清空"},
     {"PID", "进程ID"},
     {"Total", "总数"},
     {"Command lines", "命令行"},
@@ -57,6 +57,9 @@ inline constexpr TranslationLine translations_table[] = {
     {"Protection", "保护属性"},
     {"File Offset", "文件偏移"},
     {"Name", "名称"},
+    {"Address", "地址"},
+    {"Type", "类型"},
+    {"Value", "值"},
     {"Copy Start Address", "复制起始地址"},
     {"Copy Name", "复制名称"},
     {"Bytes Per Row", "每行宽度"},
@@ -75,6 +78,7 @@ inline constexpr TranslationLine translations_table[] = {
     {"Search Range", "搜索范围"},
     {"Search Hex", "搜索16进制"},
     {"Show Hex", "显示16进制"},
+    {"Invalid Pattern", "搜索值无效"},
 };
 
 inline constexpr const char* const* get_translation_line(const char* str, std::size_t len)

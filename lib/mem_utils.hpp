@@ -43,19 +43,22 @@ class MemoryViewCache
         bool valid;
         double last_update_time;
         std::vector<uint8_t> data;
+        // user input
+        std::string name;
+        MemoryViewDisplayDataType data_type;
     };
 
 public:
-    MemoryViewCache() : data_size(0), refresh_time(1.0) {}
-    MemoryViewCache(int data_size, double refresh_time = 1.0) : data_size(data_size), refresh_time(refresh_time) {}
+    MemoryViewCache() : default_data_type(MemoryViewDisplayDataType_s32), refresh_time(0.2) {}
+    MemoryViewCache(int data_size, double refresh_time = 1.0) : default_data_type(MemoryViewDisplayDataType_s32), refresh_time(refresh_time) {}
 
     void clear() { data.clear(); }
 
-    void update_data_size(int data_size)
+    void update_data_type(MemoryViewDisplayDataType data_type)
     {
-        if (this->data_size != data_size) {
+        if (default_data_type != data_type) {
             data.clear();
-            this->data_size = data_size;
+            default_data_type = data_type;
         }
     }
 
@@ -66,21 +69,25 @@ public:
         }
     }
 
-    std::pair<bool, std::vector<uint8_t>> get(const std::unique_ptr<IMemory>& mem, uint64_t addr, double current_time)
+    CacheData& get(const std::unique_ptr<IMemory>& mem, uint64_t addr, double current_time)
     {
         auto it = data.find(addr);
         if (it == data.end() || current_time - it->second.last_update_time > refresh_time) {
+            std::string name = it == data.end() ? "" : it->second.name;
+            MemoryViewDisplayDataType data_type = it == data.end() ? default_data_type : it->second.data_type;
+            int data_size = data_type_size(data_type);
             std::vector<uint8_t> buf;
             bool valid = mem->read(addr, data_size, buf) == data_size;
-            data[addr] = {valid, current_time, buf};
-            return {valid, buf};
+            data[addr] = {valid, current_time, buf, name, data_type};
+            return data[addr];
         } else {
-            return {it->second.valid, it->second.data};
+            CacheData& retval = it->second;
+            return retval;
         }
     }
 
     double refresh_time;
-    int data_size;
+    MemoryViewDisplayDataType default_data_type;
     std::map<uint64_t, CacheData> data;
 };
 
@@ -170,7 +177,7 @@ public:
                 if (pattern.is_match(data.data() + i)) {
                     uint64_t addr = region.start + i;
                     if (!on_found(addr)) {
-                        return false;
+                        return true;
                     }
                 }
             }
@@ -197,7 +204,7 @@ public:
             }
             if (pattern.is_match(buf.data())) {
                 if (!on_found(addr)) {
-                    return false;
+                    return true;
                 }
             }
         }

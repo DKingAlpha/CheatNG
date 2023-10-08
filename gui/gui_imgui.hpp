@@ -56,20 +56,7 @@ class CheatNGGUI
 {
     ImVec4 clear_color;
     ImGuiIO* io;
-    ;
     ImFont* hex_font;
-
-    // shared states used by imgui windows
-    int pid;
-    uint64_t view_addr;
-    int view_width;
-    int view_height;
-    std::unique_ptr<IProcess> proc;
-    std::unique_ptr<IMemory> mem;
-    std::unique_ptr<MemoryViewRange> mem_view;
-    std::unique_ptr<MemoryRegions> mem_regions;
-    int selected_task_index;
-    std::vector<SearchTask> search_tasks;
 
     // window states
     bool is_process_list_open;
@@ -78,11 +65,33 @@ class CheatNGGUI
     bool is_memory_search_open;
     bool is_settings_open;
 
+    // shared states used by imgui windows
+    int pid;
+
+    // memory editor states
+    uint64_t view_addr;
+    int view_width;
+    int view_height;
+    bool view_hex;
+    MemoryViewDisplayDataType view_data_type;
+
+
+    // memory search states
+    int selected_task_index;
+    std::vector<SearchTask> search_tasks;
+    
     // config
     CheatNGConfig config;
 
+    std::unique_ptr<IProcess> proc;
+    std::unique_ptr<IMemory> mem;
+    std::unique_ptr<MemoryViewRange> mem_view;
+    std::unique_ptr<MemoryRegions> mem_regions;
+
 public:
-    CheatNGGUI(ImVec4 clear_color, ImFont* hex_font) : clear_color(clear_color), hex_font(hex_font), io(&ImGui::GetIO()), selected_task_index(0)
+    CheatNGGUI(ImVec4 clear_color, ImFont* hex_font)
+        : clear_color(clear_color), hex_font(hex_font), io(&ImGui::GetIO()),
+        selected_task_index(0), config()
     {
         reset_process();
         reset_sub_windows();
@@ -102,7 +111,7 @@ private:
     bool show_results();
 
     // components
-    bool show_select_datatype(MemoryViewDisplayDataType& dt);
+    bool show_select_datatype(std::string str_id, MemoryViewDisplayDataType& dt, bool allow_aob, bool limit_width);
 
     GuiResult update_process(bool update_proc, bool update_mem_regions, bool auto_set_range, bool update_mem_view);
     bool tick_update_process();
@@ -114,6 +123,8 @@ private:
         view_addr = 0;
         view_width = 16;
         view_height = 16;
+        view_hex = true;
+        view_data_type = MemoryViewDisplayDataType_u8;
         proc.reset();
         mem.reset();
         mem_regions.reset();

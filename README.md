@@ -39,7 +39,7 @@ Portable Architecture
 | Memory Searcher | 🛠️ | 🛠️ | |
 | Script Engine | 🛠️ | 🛠️ | Script Engine (most likely to be python) that perform automation outside and inside target process |
 | Module Injector | 🛠️ | 🛠️ | Module injection in diverse bypass methods |
-| Debugger | 🛠️ | 🛠️ | Traditional / Anti-traditional Debugger |
+| Debugger | 🛠️ | 🛠️ | Traditional / Non-traditional Debugger |
 
 ## Supported OS Interaction Implementation
 

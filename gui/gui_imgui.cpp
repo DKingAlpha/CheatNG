@@ -119,18 +119,27 @@ bool CheatNGGUI::tick_update_process()
     return true;
 }
 
-bool CheatNGGUI::show_select_datatype(MemoryViewDisplayDataType& dt)
+bool CheatNGGUI::show_select_datatype(std::string str_id, MemoryViewDisplayDataType& dt, bool allow_aob, bool limit_width)
 {
-    ImGui::PushItemWidth(ImGui::CalcTextSize("[f32]").x + ImGui::GetStyle().FramePadding.x * 2.0f);
-    if (ImGui::BeginCombo("##view_data_type", data_type_name(dt).c_str(), ImGuiComboFlags_NoArrowButton)) {
+    if (limit_width) {
+        ImGui::SetNextItemWidth(ImGui::CalcTextSize("[f32]").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+    }
+    if (ImGui::BeginCombo(("##view_data_type" + str_id).c_str(), data_type_name(dt).c_str(), ImGuiComboFlags_NoArrowButton)) {
         for (int i = 0; i < MemoryViewDisplayDataType_BASE_MAX; i++) {
+            if (ImGui::Selectable(data_type_name((MemoryViewDisplayDataType)i).c_str())) {
+                dt = (MemoryViewDisplayDataType)i;
+            }
+        }
+        for (int i = MemoryViewDisplayDataType_BASE_MAX + 1; i < MemoryViewDisplayDataType_SPECIAL_MAX; i++) {
+            if (i == MemoryViewDisplayDataType_aob && !allow_aob) {
+                continue;
+            }
             if (ImGui::Selectable(data_type_name((MemoryViewDisplayDataType)i).c_str())) {
                 dt = (MemoryViewDisplayDataType)i;
             }
         }
         ImGui::EndCombo();
     }
-    ImGui::PopItemWidth();
     return true;
 }
 
@@ -150,12 +159,10 @@ bool CheatNGGUI::show_memory_editor()
     }
 
     // combo to select data types
-    static MemoryViewDisplayDataType display_data_type = MemoryViewDisplayDataType_u8;
-    show_select_datatype(display_data_type);
+    show_select_datatype("memory editor", view_data_type, false, true);
     // display in hex
-    static bool display_hex = true;
     ImGui::SameLine();
-    ImGui::Checkbox("Hex"_x, &display_hex);
+    ImGui::Checkbox("Hex"_x, &view_hex);
     // select width per row
     ImGui::SameLine();
     ImGui::PushItemWidth(ImGui::CalcTextSize("[0xff]|+|-|Bytes Per Row").x + ImGui::GetStyle().FramePadding.x * 2.0f);
@@ -217,13 +224,13 @@ bool CheatNGGUI::show_memory_editor()
             view_addr += step;
         }
     }
-    int cell_width = display_hex ? MemoryViewDisplayDataTypeStrWidthHex[display_data_type] : MemoryViewDisplayDataTypeStrWidth[display_data_type];
+    int cell_width = view_hex ? MemoryViewDisplayDataTypeStrWidthHex[view_data_type] : MemoryViewDisplayDataTypeStrWidth[view_data_type];
     ImGui::Text(std::format("{:>18s}", "|").c_str());
     ImGui::SameLine();
-    for (int i = 0; i < view_width; i += data_type_size(display_data_type)) {
+    for (int i = 0; i < view_width; i += data_type_size(view_data_type)) {
         std::string header_cell_text = std::format("{:>0{}X}", i + view_addr % view_width, cell_width);
         ImGui::TextUnformatted(header_cell_text.c_str());
-        if (i != view_width - data_type_size(display_data_type)) {
+        if (i != view_width - data_type_size(view_data_type)) {
             ImGui::SameLine();
         }
     }
@@ -231,7 +238,7 @@ bool CheatNGGUI::show_memory_editor()
     for (int i = 0; i < view_height; i++) {
         ImGui::Text("%016lX |", view_addr + i * view_width);
         ImGui::SameLine();
-        for (int j = 0; j < view_width; j += data_type_size(display_data_type)) {
+        for (int j = 0; j < view_width; j += data_type_size(view_data_type)) {
             int idx = i * view_width + j;
             uint64_t addr = view_addr + idx;
             std::string data_str;
@@ -244,7 +251,7 @@ bool CheatNGGUI::show_memory_editor()
             }
 
             // branch to editable memory
-            data_str = raw_to_str_expr(remote_data + idx, display_hex, display_data_type);
+            data_str = raw_to_str_expr(remote_data + idx, view_hex, view_data_type);
 
             static bool need_to_copy_data_to_edit = false;
             if (edit_addr == addr) {
@@ -260,7 +267,7 @@ bool CheatNGGUI::show_memory_editor()
                 }
                 int edit_flags = ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CallbackEdit | ImGuiInputTextFlags_EnterReturnsTrue;
                 if (ImGui::InputText("##edit_addr", &edit_data_str, edit_flags, memory_edit_callback, (void*)cell_width)) {
-                    std::vector<uint8_t> parsed_data = str_expr_to_raw(edit_data_str, display_hex, display_data_type);
+                    std::vector<uint8_t> parsed_data = str_expr_to_raw(edit_data_str, view_hex, view_data_type);
                     if (parsed_data.size() > 0 && memcmp(parsed_data.data(), remote_data + idx, parsed_data.size()) != 0) {
                         if (mem->write(addr, parsed_data) != parsed_data.size()) {
                             results[__LINE__] = {GuiResultAction_Error, std::format("{}: {} {:#X}", "Failed to write memory of process"_x, std::strerror(errno), addr)};
@@ -412,21 +419,21 @@ bool CheatNGGUI::show_memory_search()
         ImGui::SameLine();
         ImGui::Spacing();
         ImGui::SameLine();
+
+        static size_t hovered_id = selected_task_index;
         if (ImGui::BeginTable("##Search Tasks List", search_tasks.size(), ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingFixedFit)) {
+            ImGui::TableNextRow();
             for (size_t i = 0; i < search_tasks.size(); i++) {
                 auto& task = search_tasks[i];
-                ImGui::TableNextColumn();
+                ImGui::TableSetColumnIndex(i);
+                ImGui::PushID(i);
                 if (ImGui::Selectable(task.name.c_str(), selected_task_index == i)) {
                     selected_task_index = i;
                 }
-                static size_t hovered_id = selected_task_index;
-                if (ImGui::IsItemHovered()) {
-                    hovered_id = i;
-                }
-                std::string text_id = std::format("##Search Task {} {}", task.name, i);
-                if (ImGui::BeginPopupContextWindow(text_id.c_str())) {
-                    if (ImGui::MenuItem("Delete"_x) && !search_tasks[hovered_id].is_searching) {
-                        search_tasks.erase(search_tasks.begin() + hovered_id);
+                ImGui::PopID();
+                if (ImGui::BeginPopupContextItem()) {
+                    if (ImGui::MenuItem("Delete"_x) && !search_tasks[i].is_searching) {
+                        search_tasks.erase(search_tasks.begin() + i);
                         if (selected_task_index >= search_tasks.size() && search_tasks.size() > 0) {
                             selected_task_index = search_tasks.size() - 1;
                         }
@@ -467,24 +474,32 @@ bool CheatNGGUI::show_memory_search()
             }
         }
 
-        show_select_datatype(task.data_type);
-        static bool search_hex = false;
-        ImGui::SameLine();
-        ImGui::Checkbox("Search Hex"_x, &search_hex);
+        static std::mutex mtx_add_result;
+        size_t result_count = 0;
+        mtx_add_result.lock();
+        result_count = task.results.size();
+        mtx_add_result.unlock();
+
+        if (!task.is_searching && result_count == 0) {
+            show_select_datatype("search", task.data_type, true, true);
+        } else {
+            ImGui::Button(data_type_name(task.data_type).c_str());
+        }
         ImGui::SameLine();
 
         bool search_pattern_flags = ImGuiInputTextFlags_EnterReturnsTrue;
         if (task.is_searching) {
             search_pattern_flags |= ImGuiInputTextFlags_ReadOnly;
         }
-        ImGui::SetNextItemWidth(ImGui::CalcTextSize("🔎 Search Memory"_x).x + ImGui::GetStyle().FramePadding.x * 2.0f);
-        ImGui::InputTextWithHint("##Search Memory", "🔎 Search Memory"_x, &task.value);
+        ImGui::SetNextItemWidth(300);
+        bool enter_search = ImGui::InputTextWithHint("##Search Memory", "🔎 Search Memory"_x, &task.value, ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::SameLine();
 
-        static std::mutex mtx_add_result;
+        static std::string search_err = "";
+        bool search_hex = task.value.starts_with("0x") || task.value.starts_with("0X");
 
         if (task.is_searching) {
-            if (ImGui::Button("Stop Search"_x)) {
+            if (enter_search || ImGui::Button("Stop Search"_x)) {
                 task.is_searching = false;
                 if (task.search_thread && task.search_thread->joinable()) {
                     task.search_thread->join();
@@ -493,44 +508,48 @@ bool CheatNGGUI::show_memory_search()
             }
         }
         if (!task.is_searching) {
-            size_t result_count = 0;
-            mtx_add_result.lock();
-            result_count = task.results.size();
-            mtx_add_result.unlock();
             if (result_count == 0) {
-                if (ImGui::Button("Start Search"_x)) {
+                if (enter_search || ImGui::Button("Start Search"_x)) {
                     // new search
                     task.is_searching = true;
                     task.clear();
                     if (task.search_thread && task.search_thread->joinable()) {
                         task.search_thread->join();
                     }
-                    task.search_thread.reset(new std::thread([this, &task]() {
-                        SearchMemory::begin_search(mem, task.is_searching, search_hex, task.value, task.data_type, task.search_start, task.search_end, [&task](uint64_t addr) -> bool {
+                    task.search_thread.reset(new std::thread([this, &task, search_hex]() {
+                        search_err = "";
+                        bool search_ok = SearchMemory::begin_search(mem, task.is_searching, search_hex, task.value, task.data_type, task.search_start, task.search_end, [&task](uint64_t addr) -> bool {
                             mtx_add_result.lock();
                             task.results.push_back(addr);
                             mtx_add_result.unlock();
                             return true;
                         });
-                        task.is_searching = false;
+                        if (!search_ok) {
+                            search_err = "Invalid Pattern"_x;
+                        }
+                        task.is_searching = false; 
                     }));
                 }
             } else {
-                if (ImGui::Button("Continue Search"_x)) {
+                if (enter_search || ImGui::Button("Continue Search"_x)) {
                     // continue search
                     task.is_searching = true;
                     if (task.search_thread && task.search_thread->joinable()) {
                         task.search_thread->join();
                     }
-                    task.search_thread.reset(new std::thread([this, &task]() {
+                    task.search_thread.reset(new std::thread([this, &task, search_hex]() {
                         std::vector<uint64_t> prev_results = std::move(task.results);
                         task.clear();
-                        SearchMemory::continue_search(mem, task.is_searching, search_hex, task.value, task.data_type, prev_results, [&task](uint64_t addr) -> bool {
+                        search_err = "";
+                        bool search_ok = SearchMemory::continue_search(mem, task.is_searching, search_hex, task.value, task.data_type, prev_results, [&task](uint64_t addr) -> bool {
                             mtx_add_result.lock();
                             task.results.push_back(addr);
                             mtx_add_result.unlock();
                             return true;
                         });
+                        if (!search_ok) {
+                            search_err = "Invalid Pattern"_x;
+                        }
                         task.is_searching = false;
                     }));
                 }
@@ -541,35 +560,103 @@ bool CheatNGGUI::show_memory_search()
             }
         }
 
-        if (ImGui::BeginChild("##Search Results", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
-            std::string search_result_title = std::format("{}: {}", "Total"_x, task.results.size());
-            ImGui::Text(search_result_title.c_str());
+        if (!search_err.empty()) {
             ImGui::SameLine();
-            if (ImGui::Button("Clear"_x)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.0f, 0.0f, 1.0f));
+            ImGui::Text(search_err.c_str());
+            ImGui::PopStyleColor();
+        }
+
+        if (ImGui::BeginChild("##Search Results", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse)) {
+             if (ImGui::Button("Clear"_x)) {
                 task.clear();
             }
             static bool show_hex = false;
             ImGui::SameLine();
             ImGui::Checkbox("Show Hex"_x, &show_hex);
-            ImGui::Separator();
+            ImGui::SameLine();
+            std::string search_result_title = std::format("{}: {}", "Total"_x, task.results.size());
+            ImGui::Text(search_result_title.c_str());
+
             ImGui::BeginChild("##Search Results List", ImVec2(0, 0), true, ImGuiWindowFlags_AlwaysAutoResize);
             mtx_add_result.lock();
-            int data_size = data_type_size(task.data_type);
-            task.cache.update_data_size(data_size);
-            for (auto addr : task.results) {
-                std::string value_str;
-                auto [valid, buf] = task.cache.get(mem, addr, data_size);
-                if (valid) {
-                    value_str = raw_to_str_expr(buf.data(), show_hex, task.data_type);
-                    if (task.data_type < MemoryViewDisplayDataType_BASE_MAX && value_str.size() && value_str[0] == '+') {
-                        // strip the leading '+' sign
-                        value_str = value_str.substr(1);
+            task.cache.update_data_type(task.data_type);
+
+            if (ImGui::BeginTable("##value table", 4, ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable))
+            {
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableSetupColumn("Name"_x, ImGuiTableColumnFlags_WidthFixed, 200);
+                ImGui::TableSetupColumn("Address"_x, ImGuiTableColumnFlags_WidthFixed, 200);
+                ImGui::TableSetupColumn("Type"_x, ImGuiTableColumnFlags_WidthFixed, 50);
+                ImGui::TableSetupColumn("Value"_x, ImGuiTableColumnFlags_WidthStretch, 200);
+                ImGui::TableHeadersRow();
+
+                // clipper to render only visible items
+                ImGuiListClipper clipper;
+                clipper.Begin(task.results.size());
+                
+                while (clipper.Step()) {
+                    for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+                        uint64_t addr = task.results[i];
+                        auto& [valid, _last_update_time, buf, name, data_type] = task.cache.get(mem, addr, ImGui::GetTime());
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::SetNextItemWidth(ImGui::GetColumnWidth(0));
+                        ImGui::InputText(std::format("##name_{:016X}", addr).c_str(), &name);
+                        ImGui::TableSetColumnIndex(1);
+                        std::string display_addr = std::format("{:016X}", addr);
+                        if (ImGui::Selectable(display_addr.c_str())) {
+                            is_memory_editor_open = true;
+                            view_addr = addr & (~(view_width-1));
+                            view_hex = show_hex;
+                            view_data_type = data_type;
+                        }
+                        ImGui::TableSetColumnIndex(2);
+                        ImGui::SetNextItemWidth(ImGui::GetColumnWidth(2));
+                        show_select_datatype(display_addr, data_type, false, false);
+                        ImGui::TableSetColumnIndex(3);
+                        std::string value_str;
+                        if (valid) {
+                            value_str = raw_to_str_expr(buf.data(), show_hex, data_type);
+                            if (size_t off = value_str.find_first_not_of(' '); off != std::string::npos) {
+                                value_str = value_str.substr(off);
+                            }
+                            if (data_type < MemoryViewDisplayDataType_BASE_MAX && value_str.size() && value_str[0] == '+') {
+                                // strip the leading '+' sign
+                                value_str = value_str.substr(1);
+                            }
+                        } else {
+                            value_str = "??";
+                        }
+                        ImGui::SetNextItemWidth(ImGui::GetColumnWidth(3));
+                        static uint64_t edit_value_addr = 0;
+                        int input_value_flags = ImGuiInputTextFlags_EnterReturnsTrue;
+                        if (edit_value_addr != addr) {
+                            input_value_flags |= ImGuiInputTextFlags_ReadOnly;
+                            ImGui::Selectable(value_str.c_str());
+                            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                                edit_value_addr = addr;
+                            }
+                        } else {
+                            if (ImGui::InputText(std::format("##value_{:016X}", addr).c_str(), &value_str, input_value_flags)) {
+                                edit_value_addr = 0;
+                                bool enter_hex = value_str.starts_with("0x") || value_str.starts_with("0X");
+                                std::vector<uint8_t> parsed_data = str_expr_to_raw(value_str, enter_hex, data_type);
+                                if (parsed_data.size() > 0 && memcmp(parsed_data.data(), buf.data(), parsed_data.size()) != 0) {
+                                    if (mem->write(addr, parsed_data) != parsed_data.size()) {
+                                        search_err = std::format("{}: {} {:#X}", "Failed to write memory of process"_x, std::strerror(errno), addr);
+                                    } else {
+                                        search_err = "";
+                                    }
+                                } else {
+                                    search_err = std::format("{}: {}. errno: {}", "Invalid input"_x, value_str, std::strerror(errno));
+                                }
+                            }
+                        }
                     }
-                } else {
-                    value_str = "??";
                 }
-                std::string display_addr = std::format("{:016X} {}", addr, value_str);
-                ImGui::Selectable(display_addr.c_str());
+
+                ImGui::EndTable();
             }
             mtx_add_result.unlock();
             ImGui::EndChild();
@@ -701,7 +788,7 @@ bool CheatNGGUI::show_process_list()
         ImGui::Checkbox("Show Kernel Threads"_x, &show_kthread);
         if (ImGui::BeginTable("##Process List", 2,
                               ImGuiTableFlags_BordersOuter | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable)) {
-            ImGui::TableSetupColumn("PID"_x);
+            ImGui::TableSetupColumn("PID"_x, ImGuiTableColumnFlags_DefaultSort);
             ImGui::TableSetupColumn("Command lines"_x);
             ImGui::TableHeadersRow();
 
@@ -806,7 +893,7 @@ bool CheatNGGUI::show_results()
     }
     */
 
-    if (results.size() && ImGui::Button("Clear All"_x)) {
+    if (results.size() && ImGui::Button("Clear"_x)) {
         results.clear();
     }
     for (auto it = results.begin(); it != results.end();) {
@@ -882,11 +969,17 @@ bool CheatNGGUI::show_main_panel()
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Settings"_x);
         }
-        show_settings();
-
         if (pid >= 0) {
-            ImGui::SameLine();
-            ImGui::Text("[%d] %s", pid, proc ? proc->cmdlines_str().c_str() : "");
+            std::string executable_name = "";
+            if (proc) {
+                if (auto cmdlines = proc->cmdlines(); cmdlines.size() > 0) {
+                    executable_name = cmdlines[0];
+                }
+                if (size_t pos = executable_name.find_last_of("/\\"); pos != std::string::npos) {
+                    executable_name = executable_name.substr(pos + 1);
+                }
+            }
+            ImGui::Text("[%d] %s", pid, executable_name.c_str());
 
             if (ImGui::Button("🔍")) {
                 is_memory_search_open = true;
@@ -908,58 +1001,34 @@ bool CheatNGGUI::show_main_panel()
             if (ImGui::IsItemHovered()) {
                 ImGui::SetTooltip("Memory Regions"_x);
             }
-            show_memory_editor();
-            show_memory_regions();
-            show_memory_search();
         }
 
         // log
-        if (!tick_update_process()) {
-            reset_process();
-            reset_sub_windows();
-        }
         show_results();
     }
     ImGui::End();
+
+    show_settings();
+    if (pid >= 0) {
+        show_memory_editor();
+        show_memory_regions();
+        show_memory_search();
+    }
+
+    if (!tick_update_process()) {
+        reset_process();
+        reset_sub_windows();
+    }
+
     return main_window_open;
 }
 
 bool CheatNGGUI::tick()
 {
     bool retval = show_main_panel();
-    // Our state
-    static bool show_demo_window = false;
 
-    // 1. Show a simple window that we create ourselves. We use a Begin/End pair
-    // to create a named window.
-    {
-        static int counter = 0;
-
-        ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!"
-                                       // and append into it.
-        ImGui::Checkbox("Demo Window",
-                        &show_demo_window); // Edit bools storing our window
-                                            // open/close state
-
-        ImGui::ColorEdit4("clear color",
-                          (float*)&clear_color); // Edit 3 floats representing a color
-
-        if (ImGui::Button("Button")) // Buttons return true when clicked (most widgets
-                                     // return true when edited/activated)
-            counter++;
-        ImGui::SameLine();
-        ImGui::Text("counter = %d", counter);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io->Framerate, io->Framerate);
-        ImGui::End();
-    }
-
-    // 2. Show the big demo window (Most of the sample code is in
-    // ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear
-    // ImGui!).
-    if (show_demo_window)
-        ImGui::ShowDemoWindow(&show_demo_window);
-
+    // bool retval = true;
+    // ImGui::ShowDemoWindow();
     return retval;
 }
 
