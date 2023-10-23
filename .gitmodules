@@ -12,3 +12,8 @@
 	path = thirdparty/lunasvg
 	url = https://github.com/sammycage/lunasvg.git
 	branch = master
+
+[submodule "thirdparty/freetype"]
+	path = thirdparty/freetype
+	url = https://github.com/freetype/freetype.git
+	branch = master

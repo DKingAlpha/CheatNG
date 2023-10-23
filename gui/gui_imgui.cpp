@@ -158,6 +158,10 @@ bool CheatNGGUI::show_memory_editor()
         return true;
     }
 
+    if (edit_addr != 0 && io->KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)]) {
+        edit_addr = 0;
+    }
+
     // combo to select data types
     show_select_datatype("memory editor", view_data_type, false, true);
     // display in hex
@@ -630,6 +634,9 @@ bool CheatNGGUI::show_memory_search()
                         }
                         ImGui::SetNextItemWidth(ImGui::GetColumnWidth(3));
                         static uint64_t edit_value_addr = 0;
+                        if (edit_value_addr != 0 && io->KeysDown[ImGui::GetKeyIndex(ImGuiKey_Escape)]) {
+                            edit_value_addr = 0;
+                        }
                         int input_value_flags = ImGuiInputTextFlags_EnterReturnsTrue;
                         if (edit_value_addr != addr) {
                             input_value_flags |= ImGuiInputTextFlags_ReadOnly;

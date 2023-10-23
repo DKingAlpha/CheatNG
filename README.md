@@ -36,7 +36,7 @@ Portable Architecture
 | ------- | -------- | -------- | -------- |
 | Memory Editor | ✔ | 🛠️ |  |
 | Module Explorer | ✔ | 🛠️ | |
-| Memory Searcher | 🛠️ | 🛠️ | |
+| Memory Searcher | ✔ | 🛠️ | |
 | Script Engine | 🛠️ | 🛠️ | Script Engine (most likely to be python) that perform automation outside and inside target process |
 | Module Injector | 🛠️ | 🛠️ | Module injection in diverse bypass methods |
 | Debugger | 🛠️ | 🛠️ | Traditional / Non-traditional Debugger |
@@ -53,3 +53,7 @@ Implementations are extensible under strategy pattern.
 - [ ] Windows - RWProcessMemory / NtRWVirtualMemory
 - [ ] Windows - Kernel Driver
 - [ ] Nintendo Switch - Debugging
+
+## How to Build CheatNG
+
+See [BUILD.md](BUILD.md)
