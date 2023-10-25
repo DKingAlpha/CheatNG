@@ -8,6 +8,7 @@
 #include "mem.hpp"
 #include "mem_utils.hpp"
 #include "proc.hpp"
+#include "factory.hpp"
 
 enum GuiResultAction
 {
@@ -29,6 +30,7 @@ struct GuiResult
 
 struct CheatNGConfig
 {
+    TargetConfig target_config;
     ThreadImpType thread_imp_type;
     ProcessImpType process_imp_type;
     ProcessesImpType processes_imp_type;
@@ -83,6 +85,7 @@ class CheatNGGUI
     // config
     CheatNGConfig config;
 
+    std::unique_ptr<Factory> factory;
     std::unique_ptr<IProcess> proc;
     std::unique_ptr<IMemory> mem;
     std::unique_ptr<MemoryViewRange> mem_view;
@@ -93,6 +96,7 @@ public:
         : clear_color(clear_color), hex_font(hex_font), io(&ImGui::GetIO()),
         selected_task_index(0), config()
     {
+        factory = std::make_unique<Factory>(config.target_config);
         reset_process();
         reset_sub_windows();
     }

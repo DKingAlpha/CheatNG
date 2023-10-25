@@ -28,6 +28,7 @@ set(HEADER_DIRS_IMGUI
     "thirdparty/imgui/misc/cpp"
     "thirdparty/lunasvg/include"
     "thirdparty/freetype/include"
+    "thirdparty/cereal/include"
 )
 
 set(IMGUI_DEFINITIONS

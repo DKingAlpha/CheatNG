@@ -1,11 +1,11 @@
 #pragma once
 
-#include "mem.hpp"
+#include "native.hpp"
 
-class MemoryImp_LinuxUserMode : public IMemory
+class MemoryImp_LinuxUserMode : public INativeMemory
 {
 public:
-    MemoryImp_LinuxUserMode(int pid) : IMemory(pid) {}
+    MemoryImp_LinuxUserMode(int pid) : INativeMemory(pid) {}
 
     virtual MemoryRegions regions() const override;
     virtual ssize_t read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const override;

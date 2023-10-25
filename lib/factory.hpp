@@ -4,11 +4,36 @@
 #include "imp/linux/proc_usermode_proc.hpp"
 #include "imp/linux/mem_usermode_proc.hpp"
 
+
+struct TargetConfig
+{
+    enum class Mode
+    {
+        Native,     // RPC-less, run on local machine
+        Client,     // request RPC on remote server
+        Server,     // RPC server
+    };
+    enum class Protocol
+    {
+        TCP,
+        // implement udp or other types
+    };
+
+    Mode mode;
+    Protocol protocol;
+    std::string server_addr;
+    int port;
+    std::string auth;
+};
+
+
 class Factory
 {
 public:
+    Factory(TargetConfig config) : config(config) {}
+
     template <typename... Args>
-    static std::unique_ptr<IThread> create(ThreadImpType imp, Args... args)
+    std::unique_ptr<IThread> create(ThreadImpType imp, Args... args)
     {
         switch (imp)
         {
@@ -20,7 +45,7 @@ public:
     }
 
     template <typename... Args>
-    static std::unique_ptr<IProcess> create(ProcessImpType imp, Args... args)
+    std::unique_ptr<IProcess> create(ProcessImpType imp, Args... args)
     {
         switch (imp)
         {
@@ -32,7 +57,7 @@ public:
     }
 
     template <typename... Args>
-    static std::unique_ptr<IProcesses> create(ProcessesImpType imp, Args... args)
+    std::unique_ptr<IProcesses> create(ProcessesImpType imp, Args... args)
     {
         switch (imp)
         {
@@ -44,7 +69,7 @@ public:
     }
 
     template <typename... Args>
-    static std::unique_ptr<IMemory> create(MemoryImpType imp, Args... args)
+    std::unique_ptr<IMemory> create(MemoryImpType imp, Args... args)
     {
         switch (imp)
         {
@@ -54,4 +79,7 @@ public:
             return {};
         }
     }
+
+private:
+    TargetConfig config;
 };

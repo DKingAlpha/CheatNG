@@ -17,3 +17,8 @@
 	path = thirdparty/freetype
 	url = https://github.com/freetype/freetype.git
 	branch = master
+
+[submodule "thirdparty/cereal"]
+	path = thirdparty/cereal
+	url = https://github.com/USCiLab/cereal.git
+	branch = master

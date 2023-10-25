@@ -1,8 +1,8 @@
 #pragma once
 
-#include "proc.hpp"
+#include "native.hpp"
 
-class ThreadImp_LinuxUserMode : public IThread
+class ThreadImp_LinuxUserMode : public INativeThread
 {
 public:
     ThreadImp_LinuxUserMode(int id);
@@ -11,7 +11,7 @@ public:
     virtual bool is_valid() const override;
 };
 
-class ProcessImp_LinuxUserMode : public IProcess
+class ProcessImp_LinuxUserMode : public INativeProcess
 {
 public:
     ProcessImp_LinuxUserMode(int id);
@@ -29,7 +29,7 @@ public:
     virtual const std::vector<std::unique_ptr<const IProcess>> children() const override;
 };
 
-class ProcessesImp_LinuxUserMode : public IProcesses
+class ProcessesImp_LinuxUserMode : public INativeProcesses
 {
 public:
     ProcessesImp_LinuxUserMode() { update(); }

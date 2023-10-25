@@ -690,12 +690,12 @@ GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, 
 {
     if (update_proc && pid >= 0) {
         proc.reset();
-        proc = Factory::create(config.process_imp_type, pid);
+        proc = factory->create(config.process_imp_type, pid);
         if (!proc->is_valid()) {
             return {(GuiResultAction)(GuiResultAction_CloseRemoteProcess | GuiResultAction_Error), std::format("{}: {}", "Invalid pid"_x, std::strerror(errno))};
         }
         mem.reset();
-        mem = Factory::create(config.memory_imp_type, pid);
+        mem = factory->create(config.memory_imp_type, pid);
         mem_view.reset();
         mem_view = std::make_unique<MemoryViewRange>();
     }
@@ -799,7 +799,7 @@ bool CheatNGGUI::show_process_list()
             ImGui::TableSetupColumn("Command lines"_x);
             ImGui::TableHeadersRow();
 
-            static auto processes = Factory::create(config.processes_imp_type);
+            static auto processes = factory->create(config.processes_imp_type);
             static double last_update_time = 0.0;
             double current_time = ImGui::GetTime();
             if (current_time - last_update_time > 1.0) {
@@ -838,7 +838,7 @@ bool CheatNGGUI::show_process_list()
 
                 if (ImGui::BeginPopupContextItem()) {
                     selected_pid = proc->id;
-                    std::string jump_to_parent = std::format("{} [{}] {}", "Jump To Parent"_x, proc->parent_id, Factory::create(config.process_imp_type, proc->parent_id)->cmdlines_str());
+                    std::string jump_to_parent = std::format("{} [{}] {}", "Jump To Parent"_x, proc->parent_id, factory->create(config.process_imp_type, proc->parent_id)->cmdlines_str());
                     if (ImGui::SelectableWrrapped(jump_to_parent.c_str())) {
                         selected_pid_next = proc->parent_id; // scroll in next frame
                         interested_pids.insert(selected_pid_next);

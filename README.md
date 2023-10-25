@@ -9,17 +9,33 @@ It is also designed to be extensible and customizable, so that it can be easily 
 W.I.P
 
 ```
-Portable Architecture
+Architecture Portability
 
-    +---------------------------------+
-    |           CheatNG GUI           |
-    +---------------------------------+
-      |                             |                    
-+-----v-------+      +--------------v-------------------+
-|    imgui    |      |        Abstract OS Layer         |
-+-------------+      +----------------------------------+
-|  OpenGL/SDL |      |  IProcess  |  IThread  | IMemory |
-+-------------+      +----------------------------------+
+          +------v-------+
+          |  CheatNG GUI |
+          +--------------+
+                 |        
+          +------v-------+
+          |     imgui    |
+          +--------------+
+          |  OpenGL/SDL  |
+          +--------------+
+                 |
+          +------v-------+
+          | CheatNG Core |
+          +--------------+
+                 |
+ +---------------v------------------+
+ |        Abstract OS Layer         |
+ +----------------------------------+
+ |  IProcess  |  IThread  | IMemory |
+ +----------------------------------+
+           /               \        
+          /           CheatNG Server (RPC)
+         /                   \      
+ +------v-----+        +------v-----+
+ |  Local OS  | - OR - |  Remote OS |
+ +------------+        +------------+
 ```
 
 ## Supported OS
