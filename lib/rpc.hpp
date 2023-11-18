@@ -31,12 +31,50 @@ using CerealInputArchive = cereal::BinaryInputArchive;
 // both client and server need to call this function
 void init_rpc();
 
+enum class FunctionId : uint32_t
+{
+    // new_remote
+    new_remote_ThreadImp_LinuxUserMode_int = 0x00000000,
+    new_remote_ThreadImp_LinuxUserMode_int_int = 0x00000001,
+    new_remote_ProcessImp_LinuxUserMode_int = 0x00000002,
+    new_remote_ProcessImp_LinuxUserMode_int_int = 0x00000003,
+    new_remote_ProcessesImp_LinuxUserMode = 0x00000004,
+    new_remote_MemoryImp_LinuxUserMode_int = 0x00000005,
+
+    // delete_remote
+    delete_remote_IThread = 0x00000006,
+    delete_remote_IProcess = 0x00000007,
+    delete_remote_IProcesses = 0x00000008,
+    delete_remote_IMemory = 0x00000009,
+
+    // get_remote
+    get_remote_IThread = 0x0000000a,
+    get_remote_IProcess = 0x0000000b,
+    get_remote_IProcesses = 0x0000000c,
+    get_remote_IMemory = 0x0000000d,
+
+    // IThread
+    IThread_is_valid = 0x0000000e,
+
+    // IProcess
+    IProcess_is_valid = 0x0000000f,
+    IProcess_threads = 0x00000010,
+    IProcess_children = 0x00000011,
+
+    // IProcesses
+    IProcesses_update = 0x00000012,
+
+    // IMemory
+    IMemory_read_noref = 0x00000013,
+    IMemory_write_noref = 0x00000014,
+    IMemory_regions = 0x00000015,
+};
+
 // -----------------
 
 using RemoteObjectId = uint64_t;
 
-extern std::map<std::string, std::function<std::string(const std::string&)>> functions;
-extern std::map<uintptr_t, std::string> functions_id_to_name;
+extern std::map<FunctionId, std::function<std::string(const std::string&)>> functions;
 extern std::set<RemoteObjectId> available_remote_objects;
 
 // -----------------
@@ -146,26 +184,29 @@ bool delete_remote(RemoteObjectId obj)
     return true;
 }
 
+struct NoOpDeleter
+{
+    void operator()(void*) const {}
+};
+
 template <typename T>
-std::unique_ptr<T> get_remote(RemoteObjectId obj)
+std::unique_ptr<T, NoOpDeleter> get_remote(RemoteObjectId obj)
 {
     if (available_remote_objects.find(obj) == available_remote_objects.end()) {
         return {nullptr};
     }
     T* p = reinterpret_cast<T*>(obj);
-    return std::move(std::unique_ptr<T>(p));
+    NoOpDeleter d;
+    return std::move(std::unique_ptr<T, NoOpDeleter>(p, d));
 }
 
 template <typename RetT, typename... ParamsT>
-bool register_func(std::function<RetT(ParamsT...)> func, std::string fname)
+bool register_func(std::function<RetT(ParamsT...)> func, FunctionId func_id)
 {
-    if (functions.find(fname) != functions.end()) {
+    if (functions.find(func_id) != functions.end()) {
         return false;
     }
-    uintptr_t func_id = (uintptr_t)LocalFunctionId<decltype(func)>::value;
-    functions_id_to_name[func_id] = fname;
-    functions[fname] = [fname, func](const std::string& params) -> std::string {
-        cheatng_log("calling %s\n", fname.c_str());
+    functions[func_id] = [func](const std::string& params) -> std::string {
         std::stringstream ss(params);
         FuncParams<ParamsT...> args;
         {
@@ -185,15 +226,12 @@ bool register_func(std::function<RetT(ParamsT...)> func, std::string fname)
 
 // plain c/c++ function (*free* function)
 template <typename RetT, typename... ParamsT>
-bool register_func(RetT (*func)(ParamsT...), std::string fname)
+bool register_func(RetT (*func)(ParamsT...), FunctionId func_id)
 {
-    if (functions.find(fname) != functions.end()) {
+    if (functions.find(func_id) != functions.end()) {
         return false;
     }
-    uintptr_t func_id = (uintptr_t)LocalFunctionId<decltype(func)>::value;
-    functions_id_to_name[func_id] = fname;
-    functions[fname] = [fname, func](const std::string& params) -> std::string {
-        cheatng_log("calling %s\n", fname.c_str());
+    functions[func_id] = [func](const std::string& params) -> std::string {
         std::stringstream ss(params);
         FuncParams<ParamsT...> args;
         {
@@ -212,21 +250,18 @@ bool register_func(RetT (*func)(ParamsT...), std::string fname)
 }
 
 template <typename ClsT, typename RetT, typename... ParamsT>
-bool register_func(RetT (ClsT::*func)(ParamsT...), std::string fname)
+bool register_func(RetT (ClsT::*func)(ParamsT...), FunctionId func_id)
 {
-    if (functions.find(fname) != functions.end()) {
+    if (functions.find(func_id) != functions.end()) {
         return false;
     }
-    uintptr_t func_id = (uintptr_t)LocalFunctionId<decltype(func)>::value;
-    functions_id_to_name[func_id] = fname;
-    functions[fname] = [fname, func](const std::string& params) -> std::string {
+    functions[func_id] = [func](const std::string& params) -> std::string {
         std::stringstream ss(params);
         MethodParams<std::tuple<ParamsT...>> obj_args;
         {
             CerealInputArchive ar(ss);
             ar(obj_args);
         }
-        cheatng_log("calling %s (%lx)\n", fname.c_str(), obj_args.obj);
         std::tuple<ClsT*> flatten_tuple(reinterpret_cast<ClsT*>(obj_args.obj));
         auto retS = std::apply(std::mem_fn(func), std::tuple_cat(flatten_tuple, obj_args.params));
         std::stringstream ss2;
@@ -278,17 +313,14 @@ private:
     bool authed = false;
     std::mutex mutex;
 
-    bool do_call(std::string fname, std::string& ret, std::string params)
+    bool do_call(FunctionId func_id, std::string& ret, std::string params)
     {
         if (!authed) {
             return false;
         }
-        auto it = functions.find(fname);
-        if (it == functions.end()) {
-            return false;
-        }
+        std::string s_func_id = std::to_string((uint32_t)func_id);
         std::lock_guard<std::mutex> lock(mutex);
-        TunnelStatus status = tunnel->send(fname);
+        TunnelStatus status = tunnel->send(s_func_id);
         if (status == TunnelStatus::OK) {
             status = tunnel->send(params);
         }
@@ -311,14 +343,8 @@ private:
 public:
     // explicitly specify RetT and ParamsTuple, to avoid inaccurate deduction of func param types
     template <typename FType, typename RetT = typename FuncType<FType>::Ret, typename ParamsTuple = typename FuncType<FType>::ParamsTuple>
-    bool call(FType func, RetT& ret, ParamsTuple&& args)
+    bool call(FunctionId func_id, FType func, RetT& ret, ParamsTuple&& args)
     {
-        uintptr_t func_id = (uintptr_t)LocalFunctionId<FType>::value;
-        auto it = functions_id_to_name.find(func_id);
-        if (it == functions_id_to_name.end()) {
-            return false;
-        }
-        auto fname = it->second;
         std::stringstream ss;
         {
             CerealOutputArchive ar(ss);
@@ -326,7 +352,7 @@ public:
         }
         std::string params = ss.str();
         std::string ret_data;
-        bool ok = do_call(fname, ret_data, params);
+        bool ok = do_call(func_id, ret_data, params);
         if (!ok) {
             return false;
         }
@@ -341,15 +367,8 @@ public:
     }
 
     template <typename FType, typename RetT = typename FuncType<FType>::Ret, typename ParamsTuple = typename FuncType<FType>::ParamsTuple>
-    bool call(RemoteObjectId obj, FType func, RetT& ret, ParamsTuple&& args)
+    bool call(FunctionId func_id, RemoteObjectId obj, FType func, RetT& ret, ParamsTuple&& args)
     {
-        uintptr_t func_id = (uintptr_t)LocalFunctionId<FType>::value;
-        auto it = functions_id_to_name.find(func_id);
-        if (it == functions_id_to_name.end()) {
-            return false;
-        }
-        auto fname = it->second;
-
         MethodParams<ParamsTuple> obj_args{.obj = obj, .params = args};
 
         std::stringstream ss;
@@ -359,7 +378,7 @@ public:
         }
         std::string params = ss.str();
         std::string ret_data;
-        bool ok = do_call(fname, ret_data, params);
+        bool ok = do_call(func_id, ret_data, params);
         if (!ok) {
             return false;
         }
@@ -417,13 +436,14 @@ public:
                     }
                     continue;
                 }
-                std::string& fname = first_data;
+                std::string& s_func_id = first_data;
                 std::string params = "";
+                FunctionId func_id = (FunctionId)std::stoul(s_func_id);
 
                 status = tunnel->recv(params);
                 std::string ret = "";
                 if (status == TunnelStatus::OK) {
-                    if (do_call(fname, ret, params)) {
+                    if (do_call(func_id, ret, params)) {
                         status = tunnel->send(ret);
                     }
                 }
@@ -462,7 +482,7 @@ public:
     }
 
 private:
-    bool do_call(std::string fname, std::string& ret, std::string params) const
+    bool do_call(FunctionId func_id, std::string& ret, std::string params) const
     {
         if (!tunnel) {
             return false;
@@ -470,7 +490,7 @@ private:
         if (!(*tunnel)) {
             return false;
         }
-        auto it = functions.find(fname);
+        auto it = functions.find(func_id);
         if (it == functions.end()) {
             return false;
         }
