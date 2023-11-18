@@ -28,7 +28,6 @@ set(HEADER_DIRS_IMGUI
     "thirdparty/imgui/misc/cpp"
     "thirdparty/lunasvg/include"
     "thirdparty/freetype/include"
-    "thirdparty/cereal/include"
 )
 
 set(IMGUI_DEFINITIONS
@@ -51,7 +50,7 @@ endif()
 
 add_library(imgui STATIC ${SOURCES_IMGUI})
 target_include_directories(imgui PUBLIC ${HEADER_DIRS_IMGUI})
-target_compile_definitions(imgui PUBLIC ${IMGUI_DEFINITIONS})
+target_compile_definitions(imgui PRIVATE ${IMGUI_DEFINITIONS})
 set_property(TARGET imgui PROPERTY CXX_STANDARD 11)
 # glfw and opengl
 if (CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
@@ -82,13 +81,21 @@ include_directories(${HEADER_DIRS_GL})
 link_directories(${LIBRARY_DIRS_GL})
 
 
-###### lib
-file(GLOB SOURCES_LIB "lib/*.cpp" "lib/imp/linux/*.cpp")
-set(HEADER_DIRS_LIB "lib")
+###### core
+file(GLOB SOURCES_CORE "lib/*.cpp" "lib/imp/linux/*.cpp")
+set(HEADER_DIRS_CORE
+    "lib" 
+    "thirdparty/cereal/include"
+)
 
-add_library(mem STATIC ${SOURCES_LIB})
-target_include_directories(mem PUBLIC ${HEADER_DIRS_LIB})
+add_library(cheatng_core STATIC ${SOURCES_CORE})
+target_include_directories(cheatng_core PUBLIC ${HEADER_DIRS_CORE})
 
+# server
+file(GLOB SOURCES_SERVER "server/*.cpp")
+set(HEADER_DIRS_SERVER "server")
+add_executable(CheatNGServer ${SOURCES_SERVER})
+target_link_libraries(CheatNGServer cheatng_core)
 
 # gui
 file(GLOB_RECURSE SOURCES_GUI "gui/*.cpp")
@@ -103,8 +110,8 @@ endif()
 set(HEADER_DIRS_GUI "gui")
 
 add_executable(CheatNG ${SOURCES_GUI})
-target_include_directories(CheatNG PUBLIC ${HEADER_DIRS_GUI} ${HEADER_DIRS_LIB} ${HEADER_DIRS_IMGUI} ${HEADER_DIRS_GLFW})
-target_link_libraries(CheatNG imgui mem ${IMGUI_LIBRARIES})
+target_include_directories(CheatNG PUBLIC ${HEADER_DIRS_GUI} ${HEADER_DIRS_CORE} ${HEADER_DIRS_IMGUI} ${HEADER_DIRS_GLFW})
+target_link_libraries(CheatNG imgui cheatng_core ${IMGUI_LIBRARIES})
 target_compile_definitions(CheatNG PRIVATE ${IMGUI_DEFINITIONS})
 
 if (CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")

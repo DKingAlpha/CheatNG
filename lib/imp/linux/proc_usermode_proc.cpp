@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <sstream>
 #include <fstream>
+#include <vector>
+#include <string>
 
 
 // ====================
@@ -46,23 +48,7 @@ static std::pair<int, int> get_task_tgid_ppid(int pid)
     return {tgid, ppid};
 }
 
-// ====================
-
-ThreadImp_LinuxUserMode::ThreadImp_LinuxUserMode(int id) : TaskPropertiesReadOnly(id, get_task_tgid_ppid(id).second, get_task_comm(id)) {}
-
-ThreadImp_LinuxUserMode::ThreadImp_LinuxUserMode(int id, int parent_id) : TaskPropertiesReadOnly(id, parent_id, get_task_comm(id)) {}
-
-bool ThreadImp_LinuxUserMode::is_valid() const { return std::filesystem::exists("/proc/" + std::to_string(id)); }
-
-// ====================
-
-ProcessImp_LinuxUserMode::ProcessImp_LinuxUserMode(int id) : TaskPropertiesReadOnly(id, get_task_tgid_ppid(id).second, get_task_comm(id)) {}
-
-ProcessImp_LinuxUserMode::ProcessImp_LinuxUserMode(int id, int parent_id) : TaskPropertiesReadOnly(id, parent_id, get_task_comm(id)) {}
-
-bool ProcessImp_LinuxUserMode::is_valid() const { return std::filesystem::exists("/proc/" + std::to_string(id)); }
-
-const std::vector<std::string> ProcessImp_LinuxUserMode::cmdlines() const
+static std::vector<std::string> get_proc_cmdlines(int id)
 {
     std::vector<std::string> cmdlines;
     std::ifstream ifs("/proc/" + std::to_string(id) + "/cmdline");
@@ -78,7 +64,29 @@ const std::vector<std::string> ProcessImp_LinuxUserMode::cmdlines() const
     return cmdlines;
 }
 
-const std::vector<std::unique_ptr<IThread>> ProcessImp_LinuxUserMode::threads() const
+// ====================
+
+ThreadImp_LinuxUserMode::ThreadImp_LinuxUserMode(int id) : TaskPropertiesReadOnly(id, get_task_tgid_ppid(id).second, get_task_comm(id)) {}
+
+ThreadImp_LinuxUserMode::ThreadImp_LinuxUserMode(int id, int parent_id) : TaskPropertiesReadOnly(id, parent_id, get_task_comm(id)) {}
+
+bool ThreadImp_LinuxUserMode::is_valid() { return std::filesystem::exists("/proc/" + std::to_string(id)); }
+
+// ====================
+
+ProcessImp_LinuxUserMode::ProcessImp_LinuxUserMode(int id) : TaskPropertiesReadOnly(id, get_task_tgid_ppid(id).second, get_task_comm(id))
+{
+    const_cast<std::vector<std::string>&>(cmdlines) = get_proc_cmdlines(id);
+}
+
+ProcessImp_LinuxUserMode::ProcessImp_LinuxUserMode(int id, int parent_id) : TaskPropertiesReadOnly(id, parent_id, get_task_comm(id))
+{
+    const_cast<std::vector<std::string>&>(cmdlines) = get_proc_cmdlines(id);
+}
+
+bool ProcessImp_LinuxUserMode::is_valid() { return std::filesystem::exists("/proc/" + std::to_string(id)); }
+
+const std::vector<std::unique_ptr<IThread>> ProcessImp_LinuxUserMode::threads()
 {
     std::vector<std::unique_ptr<IThread>> threads;
     std::filesystem::path task_folder = "/proc/" + std::to_string(id) + "/task";
@@ -96,7 +104,7 @@ const std::vector<std::unique_ptr<IThread>> ProcessImp_LinuxUserMode::threads() 
 }
 
 
-const std::vector<std::unique_ptr<const IProcess>> ProcessImp_LinuxUserMode::children() const
+const std::vector<std::unique_ptr<const IProcess>> ProcessImp_LinuxUserMode::children()
 {
     std::vector<std::unique_ptr<const IProcess>> children;
     for (const auto& entry : std::filesystem::directory_iterator("/proc/" + std::to_string(id) + "/task")) {
@@ -119,7 +127,7 @@ const std::vector<std::unique_ptr<const IProcess>> ProcessImp_LinuxUserMode::chi
 
 // ====================
 
-void ProcessesImp_LinuxUserMode::update()
+bool ProcessesImp_LinuxUserMode::update()
 {
     this->clear();
     for (const auto& entry : std::filesystem::directory_iterator("/proc")) {
@@ -152,4 +160,5 @@ void ProcessesImp_LinuxUserMode::update()
         this->push_back(std::make_unique<ProcessImp_LinuxUserMode>(pid, ppid));
     }
     std::sort(this->begin(), this->end(), [](std::unique_ptr<IProcess>& a, std::unique_ptr<IProcess>& b) { return a->id < b->id; });
+    return true;
 }

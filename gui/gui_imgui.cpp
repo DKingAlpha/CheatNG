@@ -709,7 +709,7 @@ GuiResult CheatNGGUI::update_process(bool update_proc, bool update_mem_regions, 
 
     if (auto_set_range && proc && mem_regions && mem_view && !view_addr) {
         std::string main_keyword;
-        if (auto cmdlines = proc->cmdlines(); cmdlines.size() > 0) {
+        if (auto cmdlines = proc->cmdlines; cmdlines.size() > 0) {
             main_keyword = cmdlines[0];
         }
         if (main_keyword.empty()) {
@@ -979,7 +979,7 @@ bool CheatNGGUI::show_main_panel()
         if (pid >= 0) {
             std::string executable_name = "";
             if (proc) {
-                if (auto cmdlines = proc->cmdlines(); cmdlines.size() > 0) {
+                if (auto cmdlines = proc->cmdlines; cmdlines.size() > 0) {
                     executable_name = cmdlines[0];
                 }
                 if (size_t pos = executable_name.find_last_of("/\\"); pos != std::string::npos) {

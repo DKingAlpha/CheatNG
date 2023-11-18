@@ -4,7 +4,7 @@
 #include <sstream>
 #include <sys/uio.h>
 
-ssize_t MemoryImp_LinuxUserMode::read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const
+ssize_t MemoryImp_LinuxUserMode::read(uint64_t addr, size_t size, std::vector<uint8_t>& data)
 {
     data.resize(size);
     struct iovec local[1];
@@ -22,7 +22,7 @@ ssize_t MemoryImp_LinuxUserMode::read(uint64_t addr, size_t size, std::vector<ui
     return count;
 }
 
-ssize_t MemoryImp_LinuxUserMode::write(uint64_t addr, std::vector<uint8_t>& data) const
+ssize_t MemoryImp_LinuxUserMode::write(uint64_t addr, std::vector<uint8_t>& data)
 {
     struct iovec local[1];
     struct iovec remote[1];
@@ -75,7 +75,7 @@ struct linux_maps_line
     }
 };
 
-MemoryRegions MemoryImp_LinuxUserMode::regions() const
+MemoryRegions MemoryImp_LinuxUserMode::regions()
 {
     MemoryRegions regions;
     std::ifstream maps("/proc/" + std::to_string(_pid) + "/maps");

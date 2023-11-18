@@ -3,12 +3,13 @@
 #include <vector>
 #include <string>
 #include <stdint.h>
+#include <stdarg.h>
 
 class IValidBoolOp
 {
 public:
-    virtual operator bool() const { return is_valid(); }
-    virtual bool is_valid() const = 0;
+    virtual operator bool() { return is_valid(); }
+    virtual bool is_valid() = 0;
 };
 
 enum MemoryViewDisplayDataType
@@ -29,6 +30,28 @@ enum MemoryViewDisplayDataType
     MemoryViewDisplayDataType_aob,      // hex string with space-seperated wildcard '?' or "??" as a byte
     MemoryViewDisplayDataType_SPECIAL_MAX,
 };
+
+struct TargetConfig
+{
+    enum class Protocol
+    {
+        TCP,
+        // implement udp or other types
+    };
+    Protocol protocol;
+    std::string server_addr;
+    int port;
+    std::string auth;
+};
+
+inline void cheatng_log(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
+
 
 std::string data_type_name(MemoryViewDisplayDataType dt);
 int data_type_size(MemoryViewDisplayDataType dt);

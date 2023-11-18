@@ -95,6 +95,9 @@ struct MemoryRegion
     uint64_t file_offset;
     MemoryProtectionFlags prot;
     std::string name;
+
+    template <class Archive>
+    void serialize(Archive& archive) { archive(start, size, file_offset, prot, name); }
 };
 
 class MemoryRegions : public std::vector<MemoryRegion>
@@ -151,13 +154,21 @@ private:
 class IMemory
 {
 public:
-    IMemory(int pid) : _pid(pid) {}
     virtual ~IMemory() = default;
 
-    virtual MemoryRegions regions() const = 0;
-    virtual ssize_t read(uint64_t addr, size_t size, std::vector<uint8_t>& data) const = 0;
-    virtual ssize_t write(uint64_t addr, std::vector<uint8_t>& data) const = 0;
+    virtual MemoryRegions regions() = 0;
+    virtual ssize_t read(uint64_t addr, size_t size, std::vector<uint8_t>& data) = 0;
+    virtual ssize_t write(uint64_t addr, std::vector<uint8_t>& data) = 0;
 
-protected:
-    int _pid;
+    // reference-less methods for RPC
+    std::tuple<ssize_t, std::vector<uint8_t>> read_noref(uint64_t addr, size_t size)
+    {
+        std::vector<uint8_t> data;
+        ssize_t ret = this->read(addr, size, data);
+        return {ret, data};
+    }
+    ssize_t write_noref(uint64_t addr, std::vector<uint8_t> data)
+    {
+        return this->write(addr, data);
+    }
 };

@@ -10,7 +10,8 @@
             "cppStandard": "c++20",
             "intelliSenseMode": "linux-clang-x64",
             "configurationProvider": "ms-vscode.cmake-tools",
-            "compilerPath": "/usr/bin/clang++"
+            "compilerPath": "/home/dking/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang",
+            "compileCommands": "${workspaceFolder}/build_android/compile_commands.json"
         }
     ],
     "version": 4

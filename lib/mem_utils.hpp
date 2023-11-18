@@ -134,7 +134,7 @@ public:
 
         size_t data_size() const { return raw.size(); }
         MemoryViewDisplayDataType data_type() const { return data_type_; }
-        bool is_valid() const override { return data_size() > 0; }
+        bool is_valid() override { return data_size() > 0; }
 
     private:
         MemoryViewDisplayDataType data_type_;

@@ -30,6 +30,7 @@ struct GuiResult
 
 struct CheatNGConfig
 {
+    bool rpc_mode;
     TargetConfig target_config;
     ThreadImpType thread_imp_type;
     ProcessImpType process_imp_type;
@@ -96,7 +97,14 @@ public:
         : clear_color(clear_color), hex_font(hex_font), io(&ImGui::GetIO()),
         selected_task_index(0), config()
     {
-        factory = std::make_unique<Factory>(config.target_config);
+        config.rpc_mode = true;
+        config.target_config.protocol = TargetConfig::Protocol::TCP;
+        config.target_config.server_addr = "127.0.0.1";
+        config.target_config.port = 22334;
+        config.target_config.auth = "123123";
+
+        init_rpc();
+        factory = std::make_unique<Factory>(config.rpc_mode, config.target_config);
         reset_process();
         reset_sub_windows();
     }

@@ -6,7 +6,6 @@
 
 #include "base.hpp"
 
-
 enum class ThreadImpType
 {
     LINUX_USERMODE_PROC,
@@ -25,29 +24,24 @@ enum class ProcessesImpType
     LINUX_KERNEL_MODULE,
 };
 
-class TaskPropertiesReadOnly
+struct TaskPropertiesReadOnly
 {
-public:
-    TaskPropertiesReadOnly(int id, int parent_id, const std::string& name) : id(id), parent_id(parent_id), name(name) {}
-
-    const int id;
-    const int parent_id;
-    const std::string name;
-
-    TaskPropertiesReadOnly& operator=(const TaskPropertiesReadOnly& other)
-    {
-        const_cast<int&>(id) = other.id;
-        const_cast<int&>(parent_id) = other.parent_id;
-        const_cast<std::string&>(name) = other.name;
-        return *this;
-    }
+    int id;
+    int parent_id;
+    std::string name;
 };
+
+// DO NOT mark "const" to methods/members in these interfaces, because RPC proxy class may alter internal class state, 
+// for example, to update connection status.
 
 class IThread : public IValidBoolOp, public virtual TaskPropertiesReadOnly
 {
 public:
     IThread() = default;
     virtual ~IThread() = default;
+
+    template <class Archive>
+    void serialize(Archive& archive) { archive(id, parent_id, name); }
 };
 
 class IProcess : public IValidBoolOp, public virtual TaskPropertiesReadOnly
@@ -56,15 +50,19 @@ public:
     IProcess() = default;
     virtual ~IProcess() = default;
 
-    virtual const std::vector<std::string> cmdlines() const = 0;
-    virtual const std::vector<std::unique_ptr<IThread>> threads() const = 0;
-    virtual const std::vector<std::unique_ptr<const IProcess>> children() const = 0;
+    std::vector<std::string> cmdlines;
+
+    template <class Archive>
+    void serialize(Archive& archive) { archive(id, parent_id, name, cmdlines); }
+
+    virtual const std::vector<std::unique_ptr<IThread>> threads() = 0;
+    virtual const std::vector<std::unique_ptr<const IProcess>> children() = 0;
 
     // helper function
     const std::string cmdlines_str() const
     {
         std::string s;
-        for (const auto& cmdline : cmdlines()) {
+        for (const auto& cmdline : cmdlines) {
             s += cmdline + " ";
         }
         return s;
@@ -82,7 +80,8 @@ public:
     /**
      * @brief update process list stored in this object.
      */
-    virtual void update() = 0;
+    virtual bool update() = 0;
+
 
     /**
      * @brief get process by pid, binary search to improve performance.
@@ -90,6 +89,8 @@ public:
      * @param id pid
      * @return Process* nullptr if not found
      */
+
+    /* RPC in-compatible
     const IProcess* get(int id) const
     {
         // binary search
@@ -107,4 +108,5 @@ public:
         }
         return nullptr;
     }
+    */
 };
