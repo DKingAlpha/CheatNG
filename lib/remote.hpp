@@ -20,10 +20,44 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(IProcess, ProcessImp_LinuxUserMode);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(IProcesses, ProcessesImp_LinuxUserMode);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(IMemory, MemoryImp_LinuxUserMode);
 
-// CEREAL_FORCE_DYNAMIC_INIT(ThreadImp_LinuxUserMode)
-// CEREAL_FORCE_DYNAMIC_INIT(ProcessImp_LinuxUserMode)
-// CEREAL_FORCE_DYNAMIC_INIT(ProcessesImp_LinuxUserMode)
-// CEREAL_FORCE_DYNAMIC_INIT(MemoryImp_LinuxUserMode)
+enum class FunctionId : uint32_t
+{
+    // new_remote
+    new_remote_ThreadImp_LinuxUserMode_int = 0x00000000,
+    new_remote_ThreadImp_LinuxUserMode_int_int = 0x00000001,
+    new_remote_ProcessImp_LinuxUserMode_int = 0x00000002,
+    new_remote_ProcessImp_LinuxUserMode_int_int = 0x00000003,
+    new_remote_ProcessesImp_LinuxUserMode = 0x00000004,
+    new_remote_MemoryImp_LinuxUserMode_int = 0x00000005,
+
+    // delete_remote
+    delete_remote_IThread = 0x00000006,
+    delete_remote_IProcess = 0x00000007,
+    delete_remote_IProcesses = 0x00000008,
+    delete_remote_IMemory = 0x00000009,
+
+    // get_remote
+    get_remote_IThread = 0x0000000a,
+    get_remote_IProcess = 0x0000000b,
+    get_remote_IProcesses = 0x0000000c,
+    get_remote_IMemory = 0x0000000d,
+
+    // IThread
+    IThread_is_valid = 0x0000000e,
+
+    // IProcess
+    IProcess_is_valid = 0x0000000f,
+    IProcess_threads = 0x00000010,
+    IProcess_children = 0x00000011,
+
+    // IProcesses
+    IProcesses_update = 0x00000012,
+
+    // IMemory
+    IMemory_read_noref = 0x00000013,
+    IMemory_write_noref = 0x00000014,
+    IMemory_regions = 0x00000015,
+};
 
 
 class RemoteThread : public IThread
