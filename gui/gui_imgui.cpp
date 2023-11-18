@@ -681,6 +681,8 @@ bool CheatNGGUI::show_settings()
     }
     ImGui::SetNextWindowSize(ImVec2(1280, 600), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Settings"_x, &is_settings_open)) {
+    } else {
+        processes.reset();
     }
     ImGui::End();
     return true;
@@ -799,7 +801,10 @@ bool CheatNGGUI::show_process_list()
             ImGui::TableSetupColumn("Command lines"_x);
             ImGui::TableHeadersRow();
 
-            static auto processes = factory->create(config.processes_imp_type);
+            if (!processes) {
+                processes = factory->create(config.processes_imp_type);
+            }
+
             static double last_update_time = 0.0;
             double current_time = ImGui::GetTime();
             if (current_time - last_update_time > 1.0) {
@@ -976,6 +981,8 @@ bool CheatNGGUI::show_main_panel()
         if (ImGui::IsItemHovered()) {
             ImGui::SetTooltip("Settings"_x);
         }
+        ImGui::SameLine(); ImGui::Text(" FPS: %0.1f", ImGui::GetIO().Framerate);
+
         if (pid >= 0) {
             std::string executable_name = "";
             if (proc) {

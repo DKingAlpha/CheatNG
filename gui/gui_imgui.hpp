@@ -87,6 +87,7 @@ class CheatNGGUI
     CheatNGConfig config;
 
     std::unique_ptr<Factory> factory;
+    std::unique_ptr<IProcesses> processes;
     std::unique_ptr<IProcess> proc;
     std::unique_ptr<IMemory> mem;
     std::unique_ptr<MemoryViewRange> mem_view;
