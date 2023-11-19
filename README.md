@@ -106,4 +106,4 @@ We can't garantee that different template function type mapped to different addr
 
 ### Part III: Why both FunctionId and FunctionType are required to be specified in RPC call? Other RPC libraries only need a string.
 
-By passing the function type, our RPC code can infer the function signature including parameters/return value types, and do type conversion automatically. This benefits a lot.
+By passing the function type, our RPC code can infer the function signature including parameters/return value types, and do type conversion automatically. That benefits more.

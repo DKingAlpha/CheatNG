@@ -20,45 +20,6 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(IProcess, ProcessImp_LinuxUserMode);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(IProcesses, ProcessesImp_LinuxUserMode);
 CEREAL_REGISTER_POLYMORPHIC_RELATION(IMemory, MemoryImp_LinuxUserMode);
 
-enum class FunctionId : uint32_t
-{
-    // new_remote
-    new_remote_ThreadImp_LinuxUserMode_int = 0x00000000,
-    new_remote_ThreadImp_LinuxUserMode_int_int = 0x00000001,
-    new_remote_ProcessImp_LinuxUserMode_int = 0x00000002,
-    new_remote_ProcessImp_LinuxUserMode_int_int = 0x00000003,
-    new_remote_ProcessesImp_LinuxUserMode = 0x00000004,
-    new_remote_MemoryImp_LinuxUserMode_int = 0x00000005,
-
-    // delete_remote
-    delete_remote_IThread = 0x00000006,
-    delete_remote_IProcess = 0x00000007,
-    delete_remote_IProcesses = 0x00000008,
-    delete_remote_IMemory = 0x00000009,
-
-    // get_remote
-    get_remote_IThread = 0x0000000a,
-    get_remote_IProcess = 0x0000000b,
-    get_remote_IProcesses = 0x0000000c,
-    get_remote_IMemory = 0x0000000d,
-
-    // IThread
-    IThread_is_valid = 0x0000000e,
-
-    // IProcess
-    IProcess_is_valid = 0x0000000f,
-    IProcess_threads = 0x00000010,
-    IProcess_children = 0x00000011,
-
-    // IProcesses
-    IProcesses_update = 0x00000012,
-
-    // IMemory
-    IMemory_read_noref = 0x00000013,
-    IMemory_write_noref = 0x00000014,
-    IMemory_regions = 0x00000015,
-};
-
 
 class RemoteThread : public IThread
 {
@@ -92,9 +53,9 @@ public:
 
     virtual bool is_valid() override
     {
-        bool ret;
+        bool ret = false;
         ok = ok && rpc_client->call(FunctionId::IThread_is_valid, obj, &IThread::is_valid, ret, {});
-        return ret;
+        return ok && ret;
     }
 };
 
@@ -130,9 +91,9 @@ public:
 
     virtual bool is_valid() override
     {
-        bool ret;
+        bool ret = false;
         ok = ok && rpc_client->call(FunctionId::IProcess_is_valid, obj, &IProcess::is_valid, ret, {});
-        return ret;
+        return ok && ret;
     }
     virtual const std::vector<std::unique_ptr<IThread>> threads() override
     {
@@ -179,21 +140,21 @@ public:
 
     virtual bool update() override
     {
-        bool ret;
+        bool ret = false;
         ok = ok && rpc_client->call(FunctionId::IProcesses_update, obj, &IProcesses::update, ret, {});
         if (!ok) {
-            return ret;
+            return false;
         }
         std::unique_ptr<IProcesses> remote_copy;
         ok = ok && rpc_client->call(FunctionId::get_remote_IProcesses, get_remote<IProcesses>, remote_copy, {obj});
         if (!ok) {
-            return ret;
+            return false;
         }
         this->clear();
         for (auto& ptr : *remote_copy) {
             this->push_back(std::move(ptr));
         }
-        return ret;
+        return ok && ret;
     }
 };
 
